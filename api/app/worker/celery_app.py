@@ -1,6 +1,6 @@
-"""Celery worker foundation. XML parsing and AI tasks are implemented in later phases."""
+"""Celery worker configuration."""
 from celery import Celery
 from app.core.config import settings
 
-celery_app = Celery("migrapilot", broker=settings.redis_url, backend=settings.redis_url)
+celery_app = Celery("migrapilot", broker=settings.redis_url, backend=settings.redis_url, include=["app.worker.tasks"])
 celery_app.conf.update(task_serializer="json", accept_content=["json"], result_serializer="json", timezone="UTC")

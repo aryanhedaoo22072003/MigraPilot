@@ -1,4 +1,4 @@
-# MigraPilot — Phase 1 starter
+# MigraPilot — Phase 2 parser
 
 > **Convert it. Prove it. Fix it.**
 >
@@ -13,6 +13,7 @@
 - Docker Compose for Postgres, Redis, FastAPI, Celery and Vite dev server.
 - Anthropic-compatible structured AI adapter **only**. Not enabled in the UI and no AI conversions run in Phase 1.
 - Automated API tests running against an ephemeral local SQLite database (PostgreSQL integration testing remains necessary).
+- Secure PowerCenter XML/ZIP upload, Celery parse jobs, relational transformation/port lineage, and mapping retrieval.
 
 ## Run locally — Mac / Windows / Linux
 
@@ -55,6 +56,10 @@ docker compose down
 | PATCH | `/projects/{id}` | Owner + write role | Rename project |
 | DELETE | `/projects/{id}` | Owner + write role | Delete project |
 | GET | `/projects/{id}/dashboard` | Owner | Real mapping stats |
+| POST | `/projects/{id}/uploads` | Owner + Engineer/Admin | Upload `.xml` or `.zip`; returns parse job IDs |
+| GET | `/projects/{id}/mappings` | Owner | List parsed mappings |
+| GET | `/mappings/{id}` | Owning project | Mapping, transformations, ports and lineage edges |
+| GET | `/jobs/{id}` | Owning project | Parse status, progress and error detail |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -92,7 +97,8 @@ migrapilot-starter/
 │       └── lib/          # Axios client, Zustand auth
 ├── api/                  # Python FastAPI API + Celery
 │   ├── app/
-│   │   ├── routers/      # auth, projects
+│   │   ├── routers/      # auth, projects, parser APIs
+│   │   ├── services/     # safe PowerCenter parser and persistence
 │   │   ├── core/         # config, security
 │   │   ├── worker/       # Celery scaffold
 │   │   ├── ai_service.py # provider-agnostic JSON-schema AI calls
@@ -107,11 +113,23 @@ migrapilot-starter/
 
 ## Scope / product honesty
 
-The 17 SQL tables (the spec's 16 plus `ai_usage`) are prepared now, but parsing, lineage visualization, generated dbt models, actual database shadow comparisons, knowledge retrieval and AI Autopsy **are not yet implemented**. Dashboard stats are real values queried from the database, not seeded metrics or fabricated demonstrations. Integration against PostgreSQL must be tested after Docker startup.
+The parser now stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. Lineage visualization, generated dbt models, actual database shadow comparisons, knowledge retrieval and AI Autopsy **are not yet implemented**. Dashboard stats remain real values queried from the database.
+
+## Phase 2 parser behavior and limits
+
+Uploads are validated before queueing. Defaults limit the HTTP file to 10 MiB, a ZIP to 50 files and 50 MiB uncompressed content, and reject traversal paths, symlinks, suspicious compression ratios, corrupt archives, non-XML members, DTDs and entities. Tune limits with `MAX_UPLOAD_BYTES`, `MAX_ZIP_FILES`, and `MAX_ZIP_UNCOMPRESSED_BYTES`.
+
+The parser supports Expression, Filter, Joiner, Lookup, Aggregator, Router, Sorter and Update Strategy. Source and target definitions are returned as graph nodes. Expressions and table attributes are preserved, but the parser does not evaluate PowerCenter semantics, expand reusable objects absent from the export, execute SQL, or infer missing connector endpoints. Unsupported types are recorded in diagnostics; unresolved connectors fail safely rather than creating invented lineage.
+
+Non-sensitive examples live in `api/tests/fixtures/`: Expression+Filter, Lookup+Aggregator and an Oracle `NVL` expression whose cross-dialect behavior must be reviewed in the later conversion phase.
+
+## Test Phase 2 with Postman
+
+Import `postman/MigraPilot-Phase1.postman_collection.json`, `postman/MigraPilot-Phase2-Parser.postman_collection.json`, and `postman/MigraPilot-Local.postman_environment.json`. Select **MigraPilot Local**. Run Phase 1 through **Create project** but do not run its delete request, then run the Phase 2 collection in order. If Postman cannot resolve the included relative fixture path, manually select `api/tests/fixtures/expression_filter.xml` for the `file` form-data field. Poll **Get parse job** until `status` is `completed`, then run the mapping list and detail requests.
 
 ### Next development phases
 
-2. PowerCenter XML and ZIP validation / parsing, relational lineage, upload+job APIs.
+2. PowerCenter XML and ZIP validation / parsing, relational lineage, upload+job APIs. **Implemented.**
 3. React Flow graph, column-level lineage and inspected transformations.
 4. Real schema-validated Claude-to-dbt code conversion, Monaco editor, usage accounting, PII controls.
 5. Read-only connections, shadow run comparisons and diff viewer.

@@ -155,6 +155,7 @@ CREATE TABLE chat_messages (
 CREATE TABLE jobs (
   id          BIGSERIAL PRIMARY KEY,
   project_id  BIGINT REFERENCES projects(id) ON DELETE CASCADE,
+  upload_id   BIGINT REFERENCES uploads(id) ON DELETE CASCADE,
   type        VARCHAR(30) NOT NULL,      -- parse, convert, shadow_run, autopsy
   status      VARCHAR(20) NOT NULL DEFAULT 'queued',
   progress    SMALLINT DEFAULT 0,
@@ -163,6 +164,7 @@ CREATE TABLE jobs (
 );
 
 CREATE INDEX idx_mappings_project ON mappings(project_id);
+CREATE INDEX idx_jobs_upload ON jobs(upload_id);
 CREATE INDEX idx_transformations_mapping ON transformations(mapping_id);
 CREATE INDEX idx_conversions_mapping ON conversions(mapping_id);
 CREATE INDEX idx_autopsies_mapping ON autopsies(mapping_id);

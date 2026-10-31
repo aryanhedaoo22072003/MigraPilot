@@ -1,0 +1,65 @@
+{
+  "info": {
+    "name": "MigraPilot — Phase 2 Parser",
+    "_postman_id": "4d51c8ee-1a4e-4b67-b21a-245ae3766802",
+    "description": "Secure PowerCenter XML upload, parse-job polling, mapping list and mapping detail. Run after Phase 1 register/login/create-project requests, or set token and project_id in MigraPilot Local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+  "item": [
+    {
+      "name": "Upload PowerCenter XML",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "../api/tests/fixtures/expression_filter.xml"}]},
+        "url": "{{base_url}}/projects/{{project_id}}/uploads",
+        "description": "multipart/form-data field name must be file. Accepts one .xml or a .zip containing XML files."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Upload accepted', () => pm.response.to.have.status(202));",
+        "const body = pm.response.json();",
+        "pm.expect(body.uploads).to.be.an('array').that.is.not.empty;",
+        "pm.environment.set('job_id', body.uploads[0].job_id);"
+      ]}}]
+    },
+    {
+      "name": "Get parse job",
+      "request": {"method": "GET", "header": [], "url": "{{base_url}}/jobs/{{job_id}}"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Job is available', () => pm.response.to.have.status(200));",
+        "pm.expect(['queued', 'running', 'completed', 'failed']).to.include(pm.response.json().status);"
+      ]}}]
+    },
+    {
+      "name": "List project mappings",
+      "request": {"method": "GET", "header": [], "url": "{{base_url}}/projects/{{project_id}}/mappings"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Mappings returned', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.expect(body).to.be.an('array').that.is.not.empty;",
+        "pm.environment.set('mapping_id', body[body.length - 1].id);"
+      ]}}]
+    },
+    {
+      "name": "Get mapping with lineage",
+      "request": {"method": "GET", "header": [], "url": "{{base_url}}/mappings/{{mapping_id}}"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Mapping detail returned', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json();",
+        "pm.expect(body.transformations).to.be.an('array').that.is.not.empty;",
+        "pm.expect(body.lineage_edges).to.be.an('array').that.is.not.empty;"
+      ]}}]
+    },
+    {
+      "name": "Upload requires JWT (negative)",
+      "auth": {"type": "noauth"},
+      "request": {
+        "method": "POST", "header": [],
+        "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "../api/tests/fixtures/expression_filter.xml"}]},
+        "url": "{{base_url}}/projects/{{project_id}}/uploads"
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('JWT required', () => pm.response.to.have.status(401));"]}}]
+    }
+  ]
+}

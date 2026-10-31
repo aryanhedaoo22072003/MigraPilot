@@ -1,19 +1,25 @@
 """Test working auth, ownership and project CRUD without requiring Docker."""
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.database import get_db
 from app.main import app
-from app.models import Base
+from app.models import Base, User
 
 
 @pytest.fixture
-async def client():
+async def session_factory():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    yield factory
+    await engine.dispose()
 
+
+@pytest.fixture
+async def client(session_factory):
     async def override_db():
         async with session_factory() as session:
             yield session
@@ -24,7 +30,6 @@ async def client():
             yield test_client
     finally:
         app.dependency_overrides.clear()
-        await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -66,7 +71,10 @@ async def test_project_isolation(client):
     result = await client.post("/api/v1/projects", headers=users[0], json={"name": "Sensitive Project"})
     project_id = result.json()["id"]
     assert (await client.get(f"/api/v1/projects/{project_id}", headers=users[1])).status_code == 404
+    assert (await client.get(f"/api/v1/projects/{project_id}/dashboard", headers=users[1])).status_code == 404
+    assert (await client.patch(f"/api/v1/projects/{project_id}", headers=users[1], json={"name": "Hijacked"})).status_code == 404
     assert (await client.delete(f"/api/v1/projects/{project_id}", headers=users[1])).status_code == 404
+    assert (await client.get(f"/api/v1/projects/{project_id}", headers=users[0])).json()["name"] == "Sensitive Project"
     assert (await client.get("/api/v1/projects", headers=users[1])).json() == []
 
 
@@ -76,5 +84,65 @@ async def test_invalid_login_and_validation(client):
     assert bad.status_code == 422
     bad_login = await client.post("/api/v1/auth/login", json={"email": "missing@example.com", "password": "wrong"})
     assert bad_login.status_code == 401
+    assert (await client.get("/api/v1/auth/me")).status_code == 401
+    assert (await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer invalid"})).status_code == 401
     health = await client.get("/api/v1/health")
     assert health.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_viewers_can_read_but_cannot_write(client, session_factory):
+    registration = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "viewer@example.com", "password": "abcdefgh123"},
+    )
+    headers = {"Authorization": "Bearer " + registration.json()["access_token"]}
+    project = await client.post(
+        "/api/v1/projects",
+        headers=headers,
+        json={"name": "Read-only Project"},
+    )
+    project_id = project.json()["id"]
+
+    async with session_factory() as session:
+        user = await session.scalar(select(User).where(User.email == "viewer@example.com"))
+        user.role = "viewer"
+        await session.commit()
+
+    assert (await client.get(f"/api/v1/projects/{project_id}", headers=headers)).status_code == 200
+    assert (await client.get("/api/v1/projects", headers=headers)).status_code == 200
+    assert (await client.post(
+        "/api/v1/projects",
+        headers=headers,
+        json={"name": "Should not be created"},
+    )).status_code == 403
+    assert (await client.patch(
+        f"/api/v1/projects/{project_id}",
+        headers=headers,
+        json={"name": "Should not be renamed"},
+    )).status_code == 403
+    assert (await client.delete(f"/api/v1/projects/{project_id}", headers=headers)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_project_update_rejects_blank_names(client):
+    registration = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "rename@example.com", "password": "abcdefgh123"},
+    )
+    headers = {"Authorization": "Bearer " + registration.json()["access_token"]}
+    project = await client.post(
+        "/api/v1/projects",
+        headers=headers,
+        json={"name": "Valid Project"},
+    )
+    project_id = project.json()["id"]
+
+    response = await client.patch(
+        f"/api/v1/projects/{project_id}",
+        headers=headers,
+        json={"name": "  "},
+    )
+
+    assert response.status_code == 422
+    assert (await client.get(f"/api/v1/projects/{project_id}", headers=headers)).json()["name"] == "Valid Project"

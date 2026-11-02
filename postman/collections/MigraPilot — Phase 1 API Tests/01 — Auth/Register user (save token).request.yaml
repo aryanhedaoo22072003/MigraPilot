@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{base_url}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{test_email}}",
+      "password": "{{local_test_password}}"
+    }
+auth:
+  type: noauth
+scripts:
+  - type: beforeRequest
+    code: pm.environment.set("test_email", "migrapilot_" + Date.now() + "@example.com");
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("Register user (save token): HTTP 201", function () { pm.response.to.have.status(201); });
+      const data = pm.response.json();
+      pm.test("Returned token and normalized email", function () { pm.expect(data.access_token).to.be.a('string'); pm.expect(data.user.email).to.eql(pm.environment.get('test_email')); });
+      if (data.access_token) { pm.environment.set('token', data.access_token); }
+    language: text/javascript
+order: 1000

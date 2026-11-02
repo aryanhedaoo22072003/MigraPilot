@@ -1,0 +1,16 @@
+name: MigraPilot Local
+values:
+  - key: base_url
+    value: 'http://localhost:8000/api/v1'
+  - key: test_email
+    value: ''
+  - key: local_test_password
+    value: dev-only-password-12345
+  - key: token
+    secret: true
+  - key: project_id
+    value: ''
+  - key: job_id
+    value: ''
+  - key: mapping_id
+    value: ''

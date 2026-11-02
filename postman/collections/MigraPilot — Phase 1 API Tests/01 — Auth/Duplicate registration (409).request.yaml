@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_url}}/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{test_email}}",
+      "password": "{{local_test_password}}"
+    }
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: 'pm.test("Duplicate registration (409): HTTP 409", function () { pm.response.to.have.status(409); });'
+    language: text/javascript
+order: 6000

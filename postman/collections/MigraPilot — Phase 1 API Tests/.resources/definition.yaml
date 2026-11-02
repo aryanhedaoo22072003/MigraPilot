@@ -1,0 +1,2 @@
+$kind: collection
+description: Run with the MigraPilot Local environment in order. Disposable local test accounts, JWT and project CRUD. No Phase 2 endpoints are implemented yet.

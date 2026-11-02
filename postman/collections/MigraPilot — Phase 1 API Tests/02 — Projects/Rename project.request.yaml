@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{base_url}}/projects/{{project_id}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Postman Test Migration Updated"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Rename project: HTTP 200", function () { pm.response.to.have.status(200); });
+      pm.test("Name updated", function () { pm.expect(pm.response.json().name).to.eql("Postman Test Migration Updated"); });
+    language: text/javascript
+order: 5000

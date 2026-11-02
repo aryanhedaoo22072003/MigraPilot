@@ -1,0 +1,18 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/projects
+description: ""
+url: http://localhost:8000/api/v1/projects
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "name": "Informatica to PostgreSQL Migration",
+      "source_system": "powercenter",
+      "target_system": "dbt_postgres"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_00o5}}"
+order: 5000

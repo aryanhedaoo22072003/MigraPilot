@@ -1,0 +1,16 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/projects/4
+description: ""
+url: http://localhost:8000/api/v1/projects/4
+method: PATCH
+body:
+  type: json
+  content: |-
+    {
+      "name": "  "
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_0ds5}}"
+order: 1000

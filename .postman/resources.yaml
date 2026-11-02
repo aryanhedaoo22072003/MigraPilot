@@ -2,6 +2,13 @@
 workspace:
   id: 3bcf59ee-8b6a-4438-9bcc-7cc591bfbce3
 
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/MigraPilot — Phase 2 Parser: 932a2f68-ff1d-4976-b790-de518ca1c3a6
+    ../postman/collections/MigraPilot — Phase 1 API Tests: 8cc4ace8-8f49-4897-aa28-a23a1ef2b95d
+
 # All resources in the `postman/` folder are automatically registered in Local View.
 # Point to additional files outside the `postman/` folder to register them individually. Example:
 #localResources:

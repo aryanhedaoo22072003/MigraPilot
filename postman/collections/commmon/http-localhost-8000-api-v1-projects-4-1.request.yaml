@@ -1,0 +1,13 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/projects/4
+description: ""
+url: http://localhost:8000/api/v1/projects/4
+method: DELETE
+body:
+  type: json
+  content: ""
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_0ds5}}"
+order: 2000

@@ -1,0 +1,13 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/auth/register
+description: ""
+url: http://localhost:8000/api/v1/auth/register
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "email": "test@migrapilot.dev",
+      "password": "Test@123456"
+    }
+order: 9000

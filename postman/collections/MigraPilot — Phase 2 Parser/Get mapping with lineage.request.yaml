@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/mappings/{{mapping_id}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Mapping detail returned', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.expect(body.transformations).to.be.an('array').that.is.not.empty;
+      pm.expect(body.lineage_edges).to.be.an('array').that.is.not.empty;
+    language: text/javascript
+order: 4000

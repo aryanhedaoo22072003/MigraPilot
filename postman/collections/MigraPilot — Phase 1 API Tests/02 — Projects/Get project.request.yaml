@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{base_url}}/projects/{{project_id}}"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Get project: HTTP 200", function () { pm.response.to.have.status(200); });
+      pm.test("Project ID matches", function () { pm.expect(String(pm.response.json().id)).to.eql(pm.environment.get("project_id")); });
+    language: text/javascript
+order: 3000

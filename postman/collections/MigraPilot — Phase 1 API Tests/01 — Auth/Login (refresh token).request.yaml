@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{base_url}}/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{test_email}}",
+      "password": "{{local_test_password}}"
+    }
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Login (refresh token): HTTP 200", function () { pm.response.to.have.status(200); });
+      const data = pm.response.json();
+      pm.test("Login has access token", function () { pm.expect(data.access_token).to.be.a('string'); });
+      if (data.access_token) { pm.environment.set('token', data.access_token); }
+    language: text/javascript
+order: 2000

@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{base_url}}/projects"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("List projects: HTTP 200", function () { pm.response.to.have.status(200); });
+      pm.test("List contains new project", function () { pm.expect(pm.response.json().some(p => String(p.id) === pm.environment.get("project_id"))).to.be.true; });
+    language: text/javascript
+order: 2000

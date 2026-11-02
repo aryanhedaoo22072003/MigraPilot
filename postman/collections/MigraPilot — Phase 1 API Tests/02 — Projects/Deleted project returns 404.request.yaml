@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/projects/{{project_id}}"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: 'pm.test("Deleted project returns 404: HTTP 404", function () { pm.response.to.have.status(404); });'
+    language: text/javascript
+order: 7000

@@ -1,0 +1,20 @@
+$kind: http-request
+description: multipart/form-data field name must be file. Accepts one .xml or a .zip containing XML files.
+url: "{{base_url}}/projects/{{project_id}}/uploads"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src:
+        - ../api/tests/fixtures/expression_filter.xml
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Upload accepted', () => pm.response.to.have.status(202));
+      const body = pm.response.json();
+      pm.expect(body.uploads).to.be.an('array').that.is.not.empty;
+      pm.environment.set('job_id', body.uploads[0].job_id);
+    language: text/javascript
+order: 1000

@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_url}}/projects/{{project_id}}/uploads"
+method: POST
+body:
+  type: formdata
+  content:
+    - type: file
+      key: file
+      src:
+        - ../api/tests/fixtures/expression_filter.xml
+scripts:
+  - type: afterResponse
+    code: pm.test('JWT required', () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 5000

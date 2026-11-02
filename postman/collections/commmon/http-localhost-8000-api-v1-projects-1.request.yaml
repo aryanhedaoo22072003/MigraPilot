@@ -1,0 +1,10 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/projects/1
+description: ""
+url: http://localhost:8000/api/v1/projects/1
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{json_web_token_00o5}}"
+order: 3000

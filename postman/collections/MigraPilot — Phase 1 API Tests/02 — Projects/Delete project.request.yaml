@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{base_url}}/projects/{{project_id}}"
+method: DELETE
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: 'pm.test("Delete project: HTTP 204", function () { pm.response.to.have.status(204); });'
+    language: text/javascript
+order: 6000

@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{base_url}}/jobs/{{job_id}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Job is available', () => pm.response.to.have.status(200));
+      pm.expect(['queued', 'running', 'completed', 'failed']).to.include(pm.response.json().status);
+    language: text/javascript
+order: 2000

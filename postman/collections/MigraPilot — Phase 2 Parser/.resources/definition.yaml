@@ -1,0 +1,8 @@
+$kind: collection
+description: Secure PowerCenter XML upload, parse-job polling, mapping list and mapping detail. Run after Phase 1 register/login/create-project requests, or set token and project_id in MigraPilot Local.
+auth:
+  - id: c2c70ca1-45ff-4f3c-879e-c1598111e1a2
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{token}}"

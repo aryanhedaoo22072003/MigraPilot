@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{base_url}}/projects"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Postman Test Migration",
+      "source_system": "powercenter",
+      "target_system": "dbt_postgres"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Create project (save project ID): HTTP 201", function () { pm.response.to.have.status(201); });
+      const data = pm.response.json();
+      pm.test("Project has numeric ID", function () { pm.expect(data.id).to.be.a('number'); pm.expect(data.name).to.eql('Postman Test Migration'); });
+      if (data.id) { pm.environment.set('project_id', String(data.id)); }
+    language: text/javascript
+order: 1000

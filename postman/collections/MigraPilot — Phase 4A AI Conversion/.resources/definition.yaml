@@ -1,0 +1,8 @@
+$kind: collection
+description: Authenticated PowerCenter-to-dbt conversion and immutable regeneration. Requires a configured Anthropic API key. Run only against non-sensitive mapping metadata.
+auth:
+  - id: 5ad7e57d-5b2e-433c-af81-3cff1f913500
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{token}}"

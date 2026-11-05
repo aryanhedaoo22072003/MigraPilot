@@ -13,3 +13,7 @@ API base: `{{base_url}}` = `http://localhost:8000/api/v1`.
 ## Phase 2 parser
 
 Import `MigraPilot-Phase2-Parser.postman_collection.json` too. It expects `token` and `project_id` from the Phase 1 register/create-project flow and saves `job_id` and `mapping_id` automatically. The upload body is multipart form-data with one file field named `file`; choose an XML fixture from `api/tests/fixtures/` or a ZIP containing XML files. Do not manually set `Content-Type`, because Postman must generate the multipart boundary.
+
+## Phase 4A conversion
+
+Import `MigraPilot-Phase4A-Conversion.postman_collection.json`. It expects an owner JWT in `token`, a parsed mapping in `mapping_id`, and a running API configured with server-side `GEMINI_API_KEY` (the default) or `ANTHROPIC_API_KEY` when `AI_PROVIDER=anthropic`. Never put an API key in Postman. **Convert mapping** saves `conversion_id`; **Regenerate conversion** creates a later version and updates that variable. A `503` means the provider is not configured, `429` can mean the application limit or provider quota was reached, and `502` means credentials, the provider call, or structured output failed. Generated SQL is returned for review and is never executed by these requests.

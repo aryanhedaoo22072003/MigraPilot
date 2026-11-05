@@ -8,6 +8,17 @@ export type Dashboard = {
   project: Project; total_mappings: number; parsed: number; converted: number; verified: number; failing: number;
   converted_percent: number; verified_percent: number; failing_percent: number;
 }
+export type MappingSummary = {
+  id: number; project_id: number; upload_id: number | null; name: string; description: string | null; status: string; created_at: string;
+}
+export type MappingPort = { id: number; name: string; datatype: string | null; direction: 'IN' | 'OUT' | 'INOUT' | 'VAR' | null; expression: string | null }
+export type MappingTransformation = {
+  id: number; name: string; type: string; logic_json: Record<string, unknown>; seq_order: number; ports: MappingPort[];
+}
+export type LineageEdge = {
+  id: number; from_port_id: number; to_port_id: number; from_transformation: string; from_port: string; to_transformation: string; to_port: string;
+}
+export type MappingDetail = MappingSummary & { transformations: MappingTransformation[]; lineage_edges: LineageEdge[] }
 
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1', timeout: 20000 })
 api.interceptors.request.use(config => {

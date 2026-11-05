@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import JSON, BigInteger, Integer, DateTime, ForeignKey, SmallInteger, String, Text, func
+from sqlalchemy import JSON, BigInteger, Integer, DateTime, ForeignKey, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -58,6 +58,7 @@ class Mapping(Base):
     upload: Mapped[Upload | None] = relationship(back_populates="mappings")
     transformations: Mapped[list["Transformation"]] = relationship(back_populates="mapping", cascade="all, delete-orphan", passive_deletes=True)
     lineage_edges: Mapped[list["LineageEdge"]] = relationship(back_populates="mapping", cascade="all, delete-orphan", passive_deletes=True)
+    conversions: Mapped[list["Conversion"]] = relationship(back_populates="mapping", passive_deletes=True)
 
 
 class Transformation(Base):
@@ -90,6 +91,34 @@ class LineageEdge(Base):
     from_port_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False)
     to_port_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False)
     mapping: Mapped[Mapping] = relationship(back_populates="lineage_edges")
+
+
+class Conversion(Base):
+    __tablename__ = "conversions"
+    __table_args__ = (UniqueConstraint("mapping_id", "version"),)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    mapping_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("mappings.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    generated_sql: Mapped[str] = mapped_column(Text, nullable=False)
+    schema_yml: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[int | None] = mapped_column(SmallInteger)
+    confidence_reasons: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    risk_flags: Mapped[list | dict | None] = mapped_column(JSON)
+    model_used: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    mapping: Mapped[Mapping] = relationship(back_populates="conversions")
+
+
+class AIUsage(Base):
+    __tablename__ = "ai_usage"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    project_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="SET NULL"))
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model_used: Mapped[str] = mapped_column(String(100), nullable=False)
+    operation: Mapped[str] = mapped_column(String(50), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Job(Base):

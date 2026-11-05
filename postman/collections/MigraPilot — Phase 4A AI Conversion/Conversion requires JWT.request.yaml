@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_url}}/mappings/{{mapping_id}}/convert"
+method: POST
+scripts:
+  - type: afterResponse
+    code: pm.test('JWT required', () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 3000

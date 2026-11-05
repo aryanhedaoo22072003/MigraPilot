@@ -72,6 +72,7 @@ CREATE TABLE conversions (
   generated_sql     TEXT NOT NULL,
   schema_yml        TEXT,
   confidence        SMALLINT,            -- 0..100
+  confidence_reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
   risk_flags        JSONB,
   model_used        VARCHAR(100),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),

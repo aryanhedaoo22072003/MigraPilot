@@ -8,5 +8,6 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+*.tsbuildinfo
 .DS_Store
 coverage/

@@ -1,0 +1,18 @@
+$kind: http-request
+description: Creates the next immutable conversion version. No request body. SQL is generated and stored but never executed.
+url: "{{base_url}}/mappings/{{mapping_id}}/convert"
+method: POST
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Conversion created', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.expect(body.generated_sql).to.be.a('string').and.not.empty;
+      pm.expect(body.schema_yml).to.include('models:');
+      pm.expect(body.confidence).to.be.within(0, 100);
+      pm.expect(body.confidence_reasons).to.be.an('array').that.is.not.empty;
+      pm.expect(body.risk_flags).to.be.an('array');
+      pm.expect(body.model_used).to.be.a('string').and.not.empty;
+      pm.environment.set('conversion_id', body.id);
+    language: text/javascript
+order: 1000

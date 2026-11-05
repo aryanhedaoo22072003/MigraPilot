@@ -1,0 +1,53 @@
+{
+  "info": {
+    "name": "MigraPilot — Phase 4A AI Conversion",
+    "_postman_id": "757bd6f2-a0d0-4e7e-bd8c-346b0210fdd4",
+    "description": "Authenticated PowerCenter-to-dbt conversion and immutable regeneration. Gemini is the default server-side provider; never put provider API keys in Postman. Run only against non-sensitive mapping metadata.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+  "item": [
+    {
+      "name": "Convert mapping",
+      "request": {
+        "method": "POST", "header": [],
+        "url": "{{base_url}}/mappings/{{mapping_id}}/convert",
+        "description": "Creates the next immutable conversion version. No request body. SQL is generated and stored but never executed."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Conversion created', () => pm.response.to.have.status(201));",
+        "const body = pm.response.json();",
+        "pm.expect(body.generated_sql).to.be.a('string').and.not.empty;",
+        "pm.expect(body.schema_yml).to.include('models:');",
+        "pm.expect(body.confidence).to.be.within(0, 100);",
+        "pm.expect(body.confidence_reasons).to.be.an('array').that.is.not.empty;",
+        "pm.expect(body.risk_flags).to.be.an('array');",
+        "pm.expect(body.model_used).to.be.a('string').and.not.empty;",
+        "pm.environment.set('conversion_id', body.id);"
+      ]}}]
+    },
+    {
+      "name": "Regenerate conversion",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"user_comment\": \"Use explicit numeric casts and preserve NULL semantics.\"\n}", "options": {"raw": {"language": "json"}}},
+        "url": "{{base_url}}/conversions/{{conversion_id}}/regenerate",
+        "description": "Creates a new version; the original conversion remains unchanged."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Regenerated version created', () => pm.response.to.have.status(201));",
+        "const body = pm.response.json();",
+        "pm.expect(body.id).not.to.eql(Number(pm.environment.get('conversion_id')));",
+        "pm.expect(body.version).to.be.above(1);",
+        "pm.environment.set('conversion_id', body.id);"
+      ]}}]
+    },
+    {
+      "name": "Conversion requires JWT",
+      "auth": {"type": "noauth"},
+      "request": {"method": "POST", "header": [], "url": "{{base_url}}/mappings/{{mapping_id}}/convert"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('JWT required', () => pm.response.to.have.status(401));"]}}]
+    }
+  ]
+}

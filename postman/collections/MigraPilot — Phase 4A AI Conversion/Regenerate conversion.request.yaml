@@ -1,0 +1,22 @@
+$kind: http-request
+description: Creates a new version; the original conversion remains unchanged.
+url: "{{base_url}}/conversions/{{conversion_id}}/regenerate"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "user_comment": "Use explicit numeric casts and preserve NULL semantics."
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Regenerated version created', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.expect(body.id).not.to.eql(Number(pm.environment.get('conversion_id')));
+      pm.expect(body.version).to.be.above(1);
+      pm.environment.set('conversion_id', body.id);
+    language: text/javascript
+order: 2000

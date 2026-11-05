@@ -20,6 +20,7 @@ export default function App() {
       <Route index element={<Dashboard />} />
       <Route path="projects" element={<Dashboard />} />
       <Route path="projects/:id" element={<ProjectWorkspace />} />
+      <Route path="projects/:id/mappings/:mappingId" element={<ProjectWorkspace />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

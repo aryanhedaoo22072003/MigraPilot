@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
@@ -150,3 +151,68 @@ class MappingSummaryResponse(BaseModel):
 class MappingDetailResponse(MappingSummaryResponse):
     transformations: list[TransformationResponse]
     lineage_edges: list[LineageEdgeResponse]
+
+
+class ConversionRiskFlag(BaseModel):
+    code: str = Field(min_length=2, max_length=80, pattern=r"^[A-Z0-9_]+$")
+    severity: str = Field(pattern=r"^(low|medium|high)$")
+    message: str = Field(min_length=3, max_length=1000)
+    transformation: str | None = Field(default=None, max_length=255)
+    port: str | None = Field(default=None, max_length=255)
+
+
+class ConversionAIOutput(BaseModel):
+    generated_sql: str = Field(min_length=20, max_length=200_000)
+    schema_yml: str = Field(min_length=10, max_length=100_000)
+    confidence: int = Field(ge=0, le=100)
+    confidence_reasons: list[str] = Field(min_length=1, max_length=20)
+    risk_flags: list[ConversionRiskFlag] = Field(default_factory=list, max_length=100)
+
+    @field_validator("generated_sql")
+    @classmethod
+    def read_only_model_sql(cls, sql: str) -> str:
+        stripped = sql.strip()
+        normalized = re.sub(r"\{\{.*?\}\}", "", stripped, flags=re.DOTALL).lstrip()
+        if not re.match(r"^(WITH|SELECT)\b", normalized, flags=re.IGNORECASE):
+            raise ValueError("Generated dbt SQL must be a SELECT or WITH query")
+        if re.search(r"\b(INSERT|UPDATE|DELETE|MERGE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|CREATE)\b", normalized, flags=re.IGNORECASE):
+            raise ValueError("Generated SQL contains a prohibited write or DDL statement")
+        return stripped
+
+    @field_validator("schema_yml")
+    @classmethod
+    def dbt_schema_document(cls, value: str) -> str:
+        if "version:" not in value or "models:" not in value:
+            raise ValueError("schema_yml must contain dbt version and models keys")
+        return value.strip()
+
+    @field_validator("confidence_reasons")
+    @classmethod
+    def clean_reasons(cls, reasons: list[str]) -> list[str]:
+        cleaned = [reason.strip() for reason in reasons if reason.strip()]
+        if not cleaned:
+            raise ValueError("At least one confidence reason is required")
+        return cleaned
+
+
+class RegenerateConversionRequest(BaseModel):
+    user_comment: str = Field(min_length=2, max_length=2000)
+
+    @field_validator("user_comment")
+    @classmethod
+    def clean_comment(cls, value: str) -> str:
+        return value.strip()
+
+
+class ConversionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    mapping_id: int
+    version: int
+    generated_sql: str
+    schema_yml: str | None
+    confidence: int | None
+    confidence_reasons: list[str]
+    risk_flags: list[ConversionRiskFlag]
+    model_used: str | None
+    created_at: datetime

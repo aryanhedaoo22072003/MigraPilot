@@ -1,4 +1,4 @@
-# MigraPilot — Phase 2 parser
+# MigraPilot — Phase 4A conversion backend
 
 > **Convert it. Prove it. Fix it.**
 >
@@ -14,6 +14,8 @@
 - Anthropic-compatible structured AI adapter **only**. Not enabled in the UI and no AI conversions run in Phase 1.
 - Automated API tests running against an ephemeral local SQLite database (PostgreSQL integration testing remains necessary).
 - Secure PowerCenter XML/ZIP upload, Celery parse jobs, relational transformation/port lineage, and mapping retrieval.
+- Interactive React Flow lineage canvas with port-level edges, Dagre layout, transformation inspector and upstream column highlighting.
+- Authenticated, schema-validated PowerCenter-to-PostgreSQL/dbt conversion endpoints with immutable versions, risk analysis and AI usage accounting.
 
 ## Run locally — Mac / Windows / Linux
 
@@ -28,6 +30,7 @@ docker compose up --build
 
 Open:
 - Website: http://localhost:5173
+- Project 6 / Mapping 2 lineage: http://localhost:5173/app/projects/6/mappings/2 (sign in as the owning user)
 - Swagger API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/api/v1/health
 
@@ -60,6 +63,8 @@ docker compose down
 | GET | `/projects/{id}/mappings` | Owner | List parsed mappings |
 | GET | `/mappings/{id}` | Owning project | Mapping, transformations, ports and lineage edges |
 | GET | `/jobs/{id}` | Owning project | Parse status, progress and error detail |
+| POST | `/mappings/{id}/convert` | Owner + Engineer/Admin | Generate and persist the next reviewed dbt conversion version |
+| POST | `/conversions/{id}/regenerate` | Owner + Engineer/Admin | Create a new version from a prior conversion and user comment |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -113,7 +118,25 @@ migrapilot-starter/
 
 ## Scope / product honesty
 
-The parser now stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. Lineage visualization, generated dbt models, actual database shadow comparisons, knowledge retrieval and AI Autopsy **are not yet implemented**. Dashboard stats remain real values queried from the database.
+The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. The Phase 4A backend generates review-only dbt SQL and schema documentation. Actual database shadow comparisons, knowledge retrieval, AI Autopsy and the conversion editor **are not yet implemented**.
+
+## Phase 3 lineage UI
+
+Open `/app/projects/{project_id}` to select a parsed mapping, or deep-link to `/app/projects/{project_id}/mappings/{mapping_id}`. The canvas automatically lays out source, transformation and target nodes from left to right. Click a node for its port expressions, table attributes and diagnostics. Click any port—especially a target port—to highlight every connector and port reachable upstream. React Flow controls provide zoom, pan, fit-view and a minimap.
+
+## Phase 4A conversion backend
+
+Gemini is the default development provider. Set `GEMINI_API_KEY` in `.env`, leave `AI_PROVIDER=gemini`, and restart the API before using conversion endpoints. The default `GEMINI_MODEL` is `gemini-3.8-flash`. Anthropic remains available by setting `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`. Shared optional settings are `AI_MAX_OUTPUT_TOKENS` (default `4096`), `AI_CONVERSION_RATE_LIMIT_PER_MINUTE` (default `5`), `AI_PROVIDER_TIMEOUT_SECONDS` (default `60`) and `AI_PROVIDER_MAX_RETRIES` (default `1`). Gemini retries are limited to transient transport, timeout and 408/5xx failures. Provider credentials remain server-side and are never returned by the API or placed in Postman.
+
+Conversion sends mapping metadata only: transformation names/types/order, ports, expressions, transformation metadata and connector endpoints. It does not send raw XML, warehouse rows, passwords or connection configuration. The selected provider must return a Pydantic-validated structure containing read-only dbt SQL, `schema.yml`, confidence reasons and risk flags. Gemini uses the Interactions API and JSON structured output through `google-genai` 2.x with provider-side request storage disabled. Its provider schema intentionally contains structural fields only to stay within Gemini's schema-complexity limit; the complete Pydantic constraints and SQL safety checks are always applied locally before persistence. Provider failures log only stage, exception class, status, elapsed time and request ID. Local checks add risks for Oracle functions, NULL/empty-string semantics, implicit casts and unsupported transformations. Every successful call records input/output token counts in `ai_usage` and inserts a new `(mapping_id, version)` row; prior versions are never overwritten. Generated SQL is stored for human review and is never executed.
+
+The built-in rate limiter is process-local and suitable for the current single API container. A multi-replica production deployment should replace it with a shared Redis-backed limit.
+
+### Phase 4A Postman
+
+Import `postman/MigraPilot-Phase4A-Conversion.postman_collection.json` and the updated local environment. Sign in as the owner of a project containing a parsed mapping, set `mapping_id`, then run **Convert mapping** followed by **Regenerate conversion**. The collection saves `conversion_id`. Without a real provider credential the expected result is `503`; automated tests use a mock provider and need no paid API key.
+
+For the verified local example, set `project_id=6` and `mapping_id=2` in **MigraPilot Local**, then obtain `token` by running the Phase 1 login request with the owner account for Project 6. Keep `GEMINI_API_KEY` only in the server `.env`; restart with `docker compose up -d --build api worker`. Run **Convert mapping** (no body), then **Regenerate conversion** (the included JSON body contains only a review instruction). A successful response is `201`, reports `model_used`, SQL, schema YAML, confidence and risks, and creates a new immutable version each time.
 
 ## Phase 2 parser behavior and limits
 
@@ -130,8 +153,8 @@ Import `postman/MigraPilot-Phase1.postman_collection.json`, `postman/MigraPilot-
 ### Next development phases
 
 2. PowerCenter XML and ZIP validation / parsing, relational lineage, upload+job APIs. **Implemented.**
-3. React Flow graph, column-level lineage and inspected transformations.
-4. Real schema-validated Claude-to-dbt code conversion, Monaco editor, usage accounting, PII controls.
+3. React Flow graph, column-level lineage and inspected transformations. **Implemented.**
+4. Real schema-validated provider-to-dbt code conversion, Monaco editor, usage accounting, PII controls. **Backend conversion implemented with Gemini and Anthropic providers; frontend editor remains pending.**
 5. Read-only connections, shadow run comparisons and diff viewer.
 6. AI Autopsy diagnosis / suggested fixes / applied revisions / reruns.
 7. Knowledge base embedding retrieval (requires an embeddings provider compatible with pgvector).

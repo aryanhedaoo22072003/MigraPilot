@@ -216,3 +216,13 @@ class ConversionResponse(BaseModel):
     risk_flags: list[ConversionRiskFlag]
     model_used: str | None
     created_at: datetime
+
+
+class ConversionSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    mapping_id: int
+    version: int
+    confidence: int | None
+    model_used: str | None
+    created_at: datetime

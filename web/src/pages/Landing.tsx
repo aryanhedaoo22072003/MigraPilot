@@ -5,8 +5,8 @@ import Logo from '../components/Logo'
 import { useAuth } from '../lib/auth'
 
 const features = [
-  { icon: Workflow, name: 'Visual lineage', description: 'Understand every transformation from source columns to target tables.', phase: 'Planned' },
-  { icon: BrainCircuit, name: 'AI-powered conversion', description: 'Turn complex PowerCenter mappings into readable, reviewable dbt SQL.', phase: 'Planned' },
+  { icon: Workflow, name: 'Visual lineage', description: 'Understand every transformation from source columns to target tables.', phase: 'Available' },
+  { icon: BrainCircuit, name: 'AI-powered conversion', description: 'Turn complex PowerCenter mappings into readable, reviewable dbt SQL.', phase: 'Available' },
   { icon: ScanSearch, name: 'AI Autopsy', description: 'Find the exact cause of broken runs and mismatched columns.', phase: 'Planned' },
   { icon: ShieldCheck, name: 'Data verification', description: 'Back every migration with real row counts, checksums and diffs.', phase: 'Planned' },
 ]

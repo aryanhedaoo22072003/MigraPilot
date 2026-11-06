@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai_service import (
@@ -16,10 +17,39 @@ from app.core.rate_limit import RateLimitExceeded, ai_conversion_limiter
 from app.database import get_db
 from app.deps import current_user, require_write
 from app.models import Conversion, User
-from app.schemas import ConversionResponse, RegenerateConversionRequest
+from app.schemas import ConversionResponse, ConversionSummaryResponse, RegenerateConversionRequest
 from app.services.conversion import invoke_conversion, load_mapping_metadata, persist_conversion
 
 router = APIRouter(tags=["AI Conversion"])
+
+
+@router.get("/mappings/{mapping_id}/conversions", response_model=list[ConversionSummaryResponse])
+async def list_mapping_conversions(
+    mapping_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    mapping = await load_mapping_metadata(db, mapping_id)
+    if mapping is None or mapping.project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Mapping not found")
+    return list(await db.scalars(
+        select(Conversion)
+        .where(Conversion.mapping_id == mapping_id)
+        .order_by(Conversion.version.desc())
+    ))
+
+
+@router.get("/conversions/{conversion_id}", response_model=ConversionResponse)
+async def get_conversion(
+    conversion_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    conversion = await db.get(Conversion, conversion_id)
+    mapping = await load_mapping_metadata(db, conversion.mapping_id) if conversion else None
+    if conversion is None or mapping is None or mapping.project.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Conversion not found")
+    return conversion
 
 
 def _check_rate_limit(user: User) -> None:

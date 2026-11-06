@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MappingDetail } from '../../lib/api'
-import { expressionDependencies, layoutLineage, traceUpstream, upstreamPortIds } from './graph'
+import { expressionDependencies, layoutLineage, NODE_WIDTH, traceUpstream, upstreamPortIds } from './graph'
 
 const mapping: MappingDetail = {
   id: 2, project_id: 6, upload_id: 1, name: 'm_orders_expression_filter', description: null, status: 'parsed', created_at: '2026-11-01T00:00:00Z',
@@ -30,6 +30,8 @@ describe('lineage graph', () => {
     expect(result.edges.every(edge => edge.animated)).toBe(true)
     const x = result.nodes.map(node => node.position.x)
     expect(x).toEqual([...x].sort((a, b) => a - b))
+    expect(NODE_WIDTH).toBe(280)
+    expect(x[1] - x[0]).toBeLessThan(450)
   })
 
   it('marks unresolved expression identifiers unknown without inventing dependencies', () => {

@@ -19,6 +19,11 @@ export type LineageEdge = {
   id: number; from_port_id: number; to_port_id: number; from_transformation: string; from_port: string; to_transformation: string; to_port: string;
 }
 export type MappingDetail = MappingSummary & { transformations: MappingTransformation[]; lineage_edges: LineageEdge[] }
+export type ConversionRisk = { code: string; severity: 'low' | 'medium' | 'high'; message: string; transformation: string | null; port: string | null }
+export type ConversionSummary = { id: number; mapping_id: number; version: number; confidence: number | null; model_used: string | null; created_at: string }
+export type Conversion = ConversionSummary & {
+  generated_sql: string; schema_yml: string | null; confidence_reasons: string[]; risk_flags: ConversionRisk[];
+}
 
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1', timeout: 20000 })
 api.interceptors.request.use(config => {

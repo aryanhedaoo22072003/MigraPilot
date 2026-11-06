@@ -65,6 +65,8 @@ docker compose down
 | GET | `/jobs/{id}` | Owning project | Parse status, progress and error detail |
 | POST | `/mappings/{id}/convert` | Owner + Engineer/Admin | Generate and persist the next reviewed dbt conversion version |
 | POST | `/conversions/{id}/regenerate` | Owner + Engineer/Admin | Create a new version from a prior conversion and user comment |
+| GET | `/mappings/{id}/conversions` | Owning project | List immutable conversion versions, newest first |
+| GET | `/conversions/{id}` | Owning project | Retrieve generated SQL, schema YAML and conversion metadata |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -137,6 +139,10 @@ The built-in rate limiter is process-local and suitable for the current single A
 Import `postman/MigraPilot-Phase4A-Conversion.postman_collection.json` and the updated local environment. Sign in as the owner of a project containing a parsed mapping, set `mapping_id`, then run **Convert mapping** followed by **Regenerate conversion**. The collection saves `conversion_id`. Without a real provider credential the expected result is `503`; automated tests use a mock provider and need no paid API key.
 
 For the verified local example, set `project_id=6` and `mapping_id=2` in **MigraPilot Local**, then obtain `token` by running the Phase 1 login request with the owner account for Project 6. Keep `GEMINI_API_KEY` only in the server `.env`; restart with `docker compose up -d --build api worker`. Run **Convert mapping** (no body), then **Regenerate conversion** (the included JSON body contains only a review instruction). A successful response is `201`, reports `model_used`, SQL, schema YAML, confidence and risks, and creates a new immutable version each time.
+
+## Phase 4B conversion workspace
+
+Open `/app/projects/{project_id}/mappings/{mapping_id}` to use the responsive lineage and SQL workspace. The desktop divider resizes the graph and editor; smaller screens use Lineage and SQL conversion tabs. Monaco is lazy-loaded and provides editable SQL, read-only schema YAML and version diffs. SQL edits are local browser drafts only: they are never sent to PostgreSQL and cannot overwrite immutable AI versions. Generate and Regenerate explicitly create new versions through the authenticated Phase 4A endpoints; the browser does not retry those writes automatically.
 
 ## Phase 2 parser behavior and limits
 

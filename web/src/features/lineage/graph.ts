@@ -11,7 +11,7 @@ export type LineageNodeData = {
   onPortSelect: (portId: number) => void
 }
 
-const NODE_WIDTH = 320
+export const NODE_WIDTH = 280
 
 const RESERVED_WORDS = new Set(['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE', 'IS', 'IN', 'LIKE', 'BETWEEN', 'THEN', 'ELSE', 'END'])
 
@@ -92,10 +92,10 @@ export function layoutLineage(
   const trace = selectedPortId ? traceUpstream(mapping, selectedPortId) : { ports: new Set<number>(), unknownPorts: new Set<number>() }
   const highlighted = trace.ports
   const graph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-  graph.setGraph({ rankdir: 'LR', ranksep: 150, nodesep: 68, marginx: 48, marginy: 42 })
+  graph.setGraph({ rankdir: 'LR', ranksep: 82, nodesep: 56, marginx: 36, marginy: 36 })
   const portOwner = new Map<number, number>()
   mapping.transformations.forEach(transformation => {
-    const height = Math.max(150, 94 + transformation.ports.length * 36)
+    const height = Math.max(142, 88 + transformation.ports.length * 34)
     graph.setNode(String(transformation.id), { width: NODE_WIDTH, height })
     transformation.ports.forEach(port => portOwner.set(port.id, transformation.id))
   })

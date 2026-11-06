@@ -100,6 +100,13 @@ async def test_convert_and_regenerate_create_immutable_versions(conversion_env):
     assert first["confidence_reasons"]
     assert first["risk_flags"][0]["code"] == "ROUNDING_REVIEW"
 
+    listed = await client.get(f"/api/v1/mappings/{mapping_id}/conversions", headers=headers)
+    assert listed.status_code == 200
+    assert [(item["id"], item["version"]) for item in listed.json()] == [(first["id"], 1)]
+    detail = await client.get(f"/api/v1/conversions/{first['id']}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["generated_sql"] == first["generated_sql"]
+
     regenerated = await client.post(
         f"/api/v1/conversions/{first['id']}/regenerate", headers=headers,
         json={"user_comment": "Use a numeric(18,2) cast for net_amount."},
@@ -137,12 +144,14 @@ async def test_conversion_enforces_ownership_and_rate_limit(conversion_env):
     other_registration = await client.post("/api/v1/auth/register", json={"email": "other-convert@example.com", "password": "securepass123"})
     other = {"Authorization": f"Bearer {other_registration.json()['access_token']}"}
     assert (await client.post(f"/api/v1/mappings/{mapping_id}/convert", headers=other)).status_code == 404
+    assert (await client.get(f"/api/v1/mappings/{mapping_id}/conversions", headers=other)).status_code == 404
     assert not provider.payloads
     assert (await client.post(f"/api/v1/mappings/{mapping_id}/convert")).status_code == 401
 
     settings.ai_conversion_rate_limit_per_minute = 1
     first = await client.post(f"/api/v1/mappings/{mapping_id}/convert", headers=owner)
     assert first.status_code == 201
+    assert (await client.get(f"/api/v1/conversions/{first.json()['id']}", headers=other)).status_code == 404
     limited = await client.post(f"/api/v1/mappings/{mapping_id}/convert", headers=owner)
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) >= 1

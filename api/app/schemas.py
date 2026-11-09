@@ -226,3 +226,33 @@ class ConversionSummaryResponse(BaseModel):
     confidence: int | None
     model_used: str | None
     created_at: datetime
+
+
+class ShadowRunCreate(BaseModel):
+    fixture_id: str = Field(min_length=1, max_length=100)
+
+
+class ShadowRunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    project_id: int
+    mapping_id: int
+    conversion_id: int
+    fixture_id: str
+    status: str
+    comparison_result: str | None
+    reference_row_count: int | None
+    migrated_row_count: int | None
+    matched_rows: int | None
+    missing_rows: int | None
+    unexpected_rows: int | None
+    duplicate_key_mismatches: int | None
+    column_mismatches: int | None
+    null_mismatches: int | None
+    numeric_precision_differences: int | None
+    mismatch_samples: list
+    execution_time_ms: int | None
+    error: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None

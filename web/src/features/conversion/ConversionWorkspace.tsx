@@ -4,9 +4,11 @@ import { AlertTriangle, Check, Clipboard, Code2, Download, GitCompareArrows, His
 import LineageGraph from '../lineage/LineageGraph'
 import { api, getErrorMessage, type Conversion, type ConversionSummary, type MappingDetail } from '../../lib/api'
 import { SqlDiff, SqlEditor } from './CodeEditor'
+import ShadowRunsPanel from '../validation/ShadowRunsPanel'
 
 type WorkspaceTab = 'lineage' | 'conversion'
 type ArtifactTab = 'sql' | 'schema'
+type ConversionView = 'code' | 'validation'
 
 function downloadText(name: string, text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }))
@@ -33,6 +35,7 @@ export default function ConversionWorkspace({ mapping }: { mapping: MappingDetai
   const [leftPercent, setLeftPercent] = useState(52)
   const [showDiff, setShowDiff] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [conversionView, setConversionView] = useState<ConversionView>('code')
 
   const versions = useQuery({
     queryKey: ['conversions', mapping.id],
@@ -156,11 +159,14 @@ export default function ConversionWorkspace({ mapping }: { mapping: MappingDetai
           <div className="conversion-metadata">
             <div><span>Version</span><strong>v{selected.data.version}</strong></div><div><span>Advisory confidence</span><strong>{selected.data.confidence ?? '—'}{selected.data.confidence !== null ? '%' : ''}</strong></div><div><span>Model</span><strong>{selected.data.model_used ?? 'Unknown'}</strong></div><div><span>Created</span><strong>{formatTime(selected.data.created_at)}</strong></div>
           </div>
+          <div className="conversion-mode-tabs" role="tablist" aria-label="Conversion and validation views"><button role="tab" aria-selected={conversionView === 'code'} onClick={() => setConversionView('code')}><Code2 size={13} /> Code & review</button><button role="tab" aria-selected={conversionView === 'validation'} onClick={() => setConversionView('validation')}><ShieldAlert size={13} /> Validation</button></div>
+          {conversionView === 'code' ? <>
           <div className="conversion-artifact-tabs" role="tablist"><button role="tab" aria-selected={artifactTab === 'sql'} onClick={() => setArtifactTab('sql')}>model.sql</button><button role="tab" aria-selected={artifactTab === 'schema'} onClick={() => setArtifactTab('schema')}>schema.yml</button><span className={dirty ? 'text-amber-300' : 'text-emerald-300'}>{dirty ? 'Unsaved local edits' : 'AI version unchanged'}</span></div>
           <div className="conversion-editor-actions"><button onClick={() => copy(artifactTab === 'sql' ? draftSql : selected.data!.schema_yml ?? '')}>{copied ? <Check size={14} /> : <Clipboard size={14} />} {copied ? 'Copied' : 'Copy'}</button><button onClick={() => downloadText(`${mapping.name}${artifactTab === 'sql' ? `.v${selected.data!.version}.sql` : '.schema.yml'}`, artifactTab === 'sql' ? draftSql : selected.data!.schema_yml ?? '', 'text/plain')}><Download size={14} /> Download</button>{artifactTab === 'sql' && <button disabled={!dirty} onClick={() => { if (canDiscard()) setDraftSql(selected.data!.generated_sql) }}><RotateCcw size={14} /> Reset</button>}</div>
           <div className="conversion-editor-area">{showDiff && previous ? previousDetail.isLoading ? <div className="conversion-state">Loading comparison…</div> : previousDetail.data ? <SqlDiff original={previousDetail.data.generated_sql} modified={draftSql} /> : <div className="conversion-state text-rose-200">Could not load the previous version.</div> : artifactTab === 'sql' ? <SqlEditor value={draftSql} onChange={setDraftSql} /> : <SqlEditor value={selected.data.schema_yml ?? ''} readOnly />}</div>
           <div className="conversion-review-grid"><div><h3>Confidence reasons</h3>{selected.data.confidence_reasons.length ? <ul>{selected.data.confidence_reasons.map(reason => <li key={reason}>{reason}</li>)}</ul> : <p>No reasons supplied.</p>}</div><div><h3>Risk flags</h3>{selected.data.risk_flags.length ? <ul>{selected.data.risk_flags.map((risk, index) => <li key={`${risk.code}-${index}`}><span className={`risk-${risk.severity}`}>{risk.severity}</span> {risk.message}</li>)}</ul> : <p>No risks reported.</p>}</div></div>
           <div className="conversion-feedback"><label htmlFor="regeneration-feedback">Regeneration feedback</label><textarea id="regeneration-feedback" value={feedback} onChange={event => setFeedback(event.target.value)} placeholder="For example: Use explicit numeric casts and preserve NULL semantics." /><button className="btn-outline" disabled={pending || feedback.trim().length < 2} onClick={runRegenerate}>{regenerate.isPending ? <LoaderCircle className="animate-spin" size={14} /> : <RefreshCw size={14} />} Regenerate as new version</button></div>
+          </> : <ShadowRunsPanel conversionId={selected.data.id} version={selected.data.version} dirty={dirty} />}
         </>}
       </>}
       {mutationError && <div className="conversion-error" role="alert"><AlertTriangle size={17} /><div><strong>AI conversion failed</strong><p>{getErrorMessage(mutationError)} No automatic retry was attempted.</p></div></div>}

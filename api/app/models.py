@@ -107,6 +107,35 @@ class Conversion(Base):
     model_used: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     mapping: Mapped[Mapping] = relationship(back_populates="conversions")
+    shadow_runs: Mapped[list["ShadowRun"]] = relationship(back_populates="conversion", passive_deletes=True)
+
+
+class ShadowRun(Base):
+    __tablename__ = "shadow_runs"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    mapping_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("mappings.id", ondelete="CASCADE"), nullable=False)
+    conversion_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("conversions.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    fixture_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
+    comparison_result: Mapped[str | None] = mapped_column(String(10))
+    reference_row_count: Mapped[int | None] = mapped_column(Integer)
+    migrated_row_count: Mapped[int | None] = mapped_column(Integer)
+    matched_rows: Mapped[int | None] = mapped_column(Integer)
+    missing_rows: Mapped[int | None] = mapped_column(Integer)
+    unexpected_rows: Mapped[int | None] = mapped_column(Integer)
+    duplicate_key_mismatches: Mapped[int | None] = mapped_column(Integer)
+    column_mismatches: Mapped[int | None] = mapped_column(Integer)
+    null_mismatches: Mapped[int | None] = mapped_column(Integer)
+    numeric_precision_differences: Mapped[int | None] = mapped_column(Integer)
+    mismatch_samples: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    execution_time_ms: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    conversion: Mapped[Conversion] = relationship(back_populates="shadow_runs")
 
 
 class AIUsage(Base):

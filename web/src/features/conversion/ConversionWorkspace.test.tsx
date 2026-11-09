@@ -39,6 +39,7 @@ beforeEach(() => {
     if (url === '/conversions/1') return { data: v1 } as never
     if (url === '/conversions/3') return { data: { ...v2, id: 3, version: 3, generated_sql: 'select 3 as order_id' } } as never
     if (url === '/conversions/4') return { data: { ...v2, id: 4, version: 4, generated_sql: 'select 4 as order_id' } } as never
+    if (url === '/conversions/2/shadow-runs' || url === '/conversions/1/shadow-runs') return { data: [] } as never
     throw new Error(`Unexpected GET ${url}`)
   })
 })
@@ -95,6 +96,20 @@ describe('ConversionWorkspace', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reset' }))
     expect(screen.getByDisplayValue('select 2 as order_id')).toBeInTheDocument()
     expect(confirm).toHaveBeenCalledWith('Discard your unsaved local SQL edits?')
+  })
+
+  it('scopes validation to the selected saved version and warns about a local draft', async () => {
+    setup()
+    const editor = await screen.findByLabelText('SQL editor')
+    fireEvent.change(editor, { target: { value: 'select local_draft' } })
+    await userEvent.click(screen.getByRole('tab', { name: 'Validation' }))
+    expect(await screen.findByText('Shadow Runs · saved v2')).toBeInTheDocument()
+    expect(screen.getByText(/not the local draft/)).toBeInTheDocument()
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await userEvent.selectOptions(screen.getByLabelText('Select conversion version'), '1')
+    expect(await screen.findByText('Shadow Runs · saved v1')).toBeInTheDocument()
+    expect(screen.queryByText(/not the local draft/)).not.toBeInTheDocument()
   })
 
   it('generates and regenerates immutable versions without frontend retries', async () => {

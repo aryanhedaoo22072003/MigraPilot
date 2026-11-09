@@ -1,4 +1,4 @@
-# MigraPilot — Phase 4A conversion backend
+# MigraPilot — through Phase 5A shadow-run backend
 
 > **Convert it. Prove it. Fix it.**
 >
@@ -67,6 +67,9 @@ docker compose down
 | POST | `/conversions/{id}/regenerate` | Owner + Engineer/Admin | Create a new version from a prior conversion and user comment |
 | GET | `/mappings/{id}/conversions` | Owning project | List immutable conversion versions, newest first |
 | GET | `/conversions/{id}` | Owning project | Retrieve generated SQL, schema YAML and conversion metadata |
+| POST | `/conversions/{id}/shadow-runs` | Owner + Engineer/Admin | Queue an isolated synthetic-data comparison |
+| GET | `/shadow-runs/{id}` | Owner | Poll status and retrieve the bounded comparison report |
+| GET | `/conversions/{id}/shadow-runs` | Owning project | List prior shadow runs newest first |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -120,7 +123,7 @@ migrapilot-starter/
 
 ## Scope / product honesty
 
-The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. The Phase 4A backend generates review-only dbt SQL and schema documentation. Actual database shadow comparisons, knowledge retrieval, AI Autopsy and the conversion editor **are not yet implemented**.
+The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. Phase 4 generates review-only dbt SQL and schema documentation. Phase 5 compares that SQL against its controlled synthetic fixture in an isolated shadow database and displays persisted reports in the conversion workspace. External warehouse connections, production-row comparisons and AI Autopsy are not implemented.
 
 ## Phase 3 lineage UI
 
@@ -143,6 +146,16 @@ For the verified local example, set `project_id=6` and `mapping_id=2` in **Migra
 ## Phase 4B conversion workspace
 
 Open `/app/projects/{project_id}/mappings/{mapping_id}` to use the responsive lineage and SQL workspace. The desktop divider resizes the graph and editor; smaller screens use Lineage and SQL conversion tabs. Monaco is lazy-loaded and provides editable SQL, read-only schema YAML and version diffs. SQL edits are local browser drafts only: they are never sent to PostgreSQL and cannot overwrite immutable AI versions. Generate and Regenerate explicitly create new versions through the authenticated Phase 4A endpoints; the browser does not retry those writes automatically.
+
+## Phase 5A shadow runs
+
+Shadow runs execute an immutable conversion only in the separate `shadow-db` container. The worker creates a unique schema per run, loads the versioned `orders_discount_v1` fixture with the loader account, compiles only the allowlisted `{{ source('raw', 'src_orders') }}` reference, validates one read-only PostgreSQL query with sqlglot, and executes it through a connection-limited read-only role. Transactions have statement/lock/idle timeouts, results and mismatch samples are bounded, and the schema is removed after the run. The shadow database has no host port and contains no application tables.
+
+Start the complete stack with `docker compose up -d --build`. Set separate `SHADOW_LOADER_PASSWORD` and `SHADOW_EXECUTOR_PASSWORD` values before first initialization. Changing them after the shadow volume is initialized requires deliberate credential rotation inside that isolated database; do not delete the application database volume. Phase 5A supports only the deterministic Mapping 2 fixture and does not execute arbitrary Jinja/dbt macros.
+
+## Phase 5B validation workspace
+
+Open a mapping conversion and select **Validation** beside **Code & review**. The workspace lists saved-version shadow runs, polls queued/running reports every three seconds, and stops at completed or failed. PASS, comparison FAIL and execution failure are visually distinct. The dashboard renders only persisted API metrics and bounded mismatch samples. Starting validation always uses the selected immutable conversion; an unsaved Monaco draft is clearly excluded.
 
 ## Phase 2 parser behavior and limits
 

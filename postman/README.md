@@ -17,3 +17,7 @@ Import `MigraPilot-Phase2-Parser.postman_collection.json` too. It expects `token
 ## Phase 4A conversion
 
 Import `MigraPilot-Phase4A-Conversion.postman_collection.json`. It expects an owner JWT in `token`, a parsed mapping in `mapping_id`, and a running API configured with server-side `GEMINI_API_KEY` (the default) or `ANTHROPIC_API_KEY` when `AI_PROVIDER=anthropic`. Never put an API key in Postman. **Convert mapping** saves `conversion_id`; **Regenerate conversion** creates a later version and updates that variable. A `503` means the provider is not configured, `429` can mean the application limit or provider quota was reached, and `502` means credentials, the provider call, or structured output failed. Generated SQL is returned for review and is never executed by these requests.
+
+## Phase 5A shadow runs
+
+The Phase 5A requests are appended to `MigraPilot-Phase4A-Conversion.postman_collection.json`; no additional workspace is needed. Set `conversion_id=2`, run **Phase 5A — Start shadow run**, then repeat **Poll shadow run report** until `status` is `completed` or `failed`. A correct sample conversion completes with `comparison_result: PASS`; a valid but different result completes with `FAIL`. **List shadow runs** is read-only. The negative request verifies a missing JWT returns `401`. These requests use only `orders_discount_v1` in the isolated shadow database and never require an AI provider call.

@@ -76,6 +76,27 @@
       "auth": {"type": "noauth"},
       "request": {"method": "POST", "header": [], "url": "{{base_url}}/mappings/{{mapping_id}}/convert"},
       "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('JWT required', () => pm.response.to.have.status(401));"]}}]
+    },
+    {
+      "name": "Phase 5A — Start shadow run",
+      "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"fixture_id\": \"orders_discount_v1\"\n}", "options": {"raw": {"language": "json"}}}, "url": "{{base_url}}/conversions/{{conversion_id}}/shadow-runs", "description": "Queues isolated execution against synthetic data. Use Conversion 2 for the verified sample."},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Shadow run queued', () => pm.response.to.have.status(202));", "const body = pm.response.json();", "pm.expect(body.status).to.eql('queued');", "pm.environment.set('shadow_run_id', body.id);"]}}]
+    },
+    {
+      "name": "Phase 5A — Poll shadow run report",
+      "request": {"method": "GET", "header": [], "url": "{{base_url}}/shadow-runs/{{shadow_run_id}}", "description": "Poll until status is completed or failed. A data mismatch is completed with comparison_result FAIL."},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Shadow run retrieved', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.expect(['queued','running','completed','failed']).to.include(body.status);"]}}]
+    },
+    {
+      "name": "Phase 5A — List shadow runs",
+      "request": {"method": "GET", "header": [], "url": "{{base_url}}/conversions/{{conversion_id}}/shadow-runs", "description": "Lists owned runs newest first."},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Shadow runs listed', () => pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.be.an('array');"]}}]
+    },
+    {
+      "name": "Phase 5A — Shadow run requires JWT",
+      "auth": {"type": "noauth"},
+      "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\"fixture_id\":\"orders_discount_v1\"}"}, "url": "{{base_url}}/conversions/{{conversion_id}}/shadow-runs"},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('JWT required', () => pm.response.to.have.status(401));"]}}]
     }
   ]
 }

@@ -34,6 +34,7 @@ export default function Dashboard() {
           { title: 'Project workspace', caption: 'Create, list and manage projects', done: true, icon: CheckCircle2 },
           { title: 'PowerCenter XML parser', caption: 'Parse mappings and transformation logic', done: true, icon: CheckCircle2 },
           { title: 'AI conversion workspace', caption: 'Generate, edit and compare dbt SQL versions', done: true, icon: CheckCircle2 },
+          { title: 'Shadow validation', caption: 'Run and inspect isolated comparison reports', done: true, icon: CheckCircle2 },
           { title: 'AI Autopsy', caption: 'Diagnose shadow-run failures', done: false, icon: Clock3 },
         ].map((item, index, items) => <div key={item.title} className="relative flex gap-4">{index < items.length - 1 && <span className="absolute left-[13px] top-8 h-[44px] w-px bg-slate-700" />}<span className={`z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-700/40 text-slate-500'}`}><item.icon size={16} /></span><div><h3 className="text-sm font-extrabold text-slate-200">{item.title}</h3><p className="mt-2 text-xs leading-5 text-slate-500">{item.caption}</p></div></div>)}</div>
         <div className="mt-8 flex items-center gap-2 rounded-xl border border-cyan-400/15 bg-cyan-500/5 px-4 py-3 text-xs text-cyan-200"><Activity size={16} /> Only working features are shown as complete.</div>

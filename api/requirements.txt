@@ -17,3 +17,4 @@ pytest-asyncio>=0.24,<2.0
 aiosqlite>=0.20,<1.0
 defusedxml>=0.7,<1.0
 python-multipart>=0.0.12,<1.0
+sqlglot>=26,<29

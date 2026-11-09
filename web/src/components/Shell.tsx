@@ -38,7 +38,7 @@ export default function Shell() {
           <div className="flex items-center gap-3 px-3.5 py-3 text-slate-600"><Settings2 size={18} /> Connections</div>
         </div>
         <div className="mt-auto space-y-4 px-2">
-          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Phase 4 active</div><p className="mt-2 text-xs leading-5 text-slate-400">Interactive lineage and reviewed AI SQL versions are ready.</p></div>
+          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Phase 5 active</div><p className="mt-2 text-xs leading-5 text-slate-400">AI SQL versions and isolated validation reports are ready.</p></div>
           <Link to="/" className="flex items-center gap-2 px-2 text-xs text-slate-500 hover:text-white"><ArrowLeft size={14} /> Back to website</Link>
         </div>
       </aside>
@@ -49,7 +49,7 @@ export default function Shell() {
           <div className="flex items-center gap-3"><button className="btn-primary hidden text-xs sm:flex" onClick={() => setCreateOpen(true)}><Plus size={15} /> New project</button><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/20 text-sm font-extrabold text-violet-200">{user?.email?.[0]?.toUpperCase() || '?'}</div><span className="hidden max-w-[160px] truncate text-xs font-semibold text-slate-300 xl:inline">{user?.email}</span><ChevronDown size={14} className="hidden text-slate-500 xl:inline" /><button onClick={() => { logout(); navigate('/login') }} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-800 hover:text-white" title="Sign out" aria-label="Sign out"><LogOut size={17} /></button></div>
         </header>
         <main className="mx-auto max-w-[1500px] px-5 py-9 sm:px-8 lg:px-10"><Outlet context={{ openCreateProject: () => setCreateOpen(true) }} /></main>
-        <footer className="mx-auto flex max-w-[1500px] flex-wrap justify-between gap-3 px-5 pb-8 text-xs text-slate-600 sm:px-8 lg:px-10"><span>MigraPilot · PostgreSQL + FastAPI</span><span className="flex items-center gap-2"><Github size={13} /> Phase 4 conversion workspace</span></footer>
+        <footer className="mx-auto flex max-w-[1500px] flex-wrap justify-between gap-3 px-5 pb-8 text-xs text-slate-600 sm:px-8 lg:px-10"><span>MigraPilot · PostgreSQL + FastAPI</span><span className="flex items-center gap-2"><Github size={13} /> Phase 5 validation workspace</span></footer>
       </div>
     </div>
     {createOpen && <CreateProjectModal onClose={() => setCreateOpen(false)} />}

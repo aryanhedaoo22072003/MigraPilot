@@ -24,6 +24,18 @@ export type ConversionSummary = { id: number; mapping_id: number; version: numbe
 export type Conversion = ConversionSummary & {
   generated_sql: string; schema_yml: string | null; confidence_reasons: string[]; risk_flags: ConversionRisk[];
 }
+export type ShadowMismatchSample = {
+  key?: unknown[]; kind?: string; column?: string; expected?: unknown; actual?: unknown; [key: string]: unknown;
+}
+export type ShadowRun = {
+  id: number; project_id: number; mapping_id: number; conversion_id: number; fixture_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed'; comparison_result: 'PASS' | 'FAIL' | null;
+  reference_row_count: number | null; migrated_row_count: number | null; matched_rows: number | null;
+  missing_rows: number | null; unexpected_rows: number | null; duplicate_key_mismatches: number | null;
+  column_mismatches: number | null; null_mismatches: number | null; numeric_precision_differences: number | null;
+  mismatch_samples: ShadowMismatchSample[]; execution_time_ms: number | null; error: string | null;
+  created_at: string; started_at: string | null; completed_at: string | null;
+}
 
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1', timeout: 20000 })
 api.interceptors.request.use(config => {

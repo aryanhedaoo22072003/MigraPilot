@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     max_zip_files: int = 50
     max_zip_uncompressed_bytes: int = 50 * 1024 * 1024
     parse_tasks_eager: bool = False
+    shadow_loader_url: str = ""
+    shadow_executor_url: str = ""
+    shadow_statement_timeout_ms: int = 5000
+    shadow_job_timeout_seconds: int = 30
+    shadow_max_rows: int = 1000
+    shadow_mismatch_sample_limit: int = 25
+    shadow_decimal_tolerance: str = "0.0001"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

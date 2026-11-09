@@ -1,14 +1,15 @@
 $kind: http-request
-url: "{{base_url}}/auth/login"
+url: http://localhost:8000/api/v1/auth/login
 method: POST
 headers:
   Content-Type: application/json
 body:
   type: json
-  content: |-
+  content: |
+    
     {
-      "email": "{{test_email}}",
-      "password": "{{local_test_password}}"
+      "email": "test@migrapilot.dev",
+      "password": "dev-only-password-12345"
     }
 auth:
   type: noauth

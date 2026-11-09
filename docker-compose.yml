@@ -22,6 +22,24 @@ services:
       interval: 5s
       retries: 10
 
+  shadow-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shadow_migrapilot
+      POSTGRES_USER: shadow_loader
+      POSTGRES_PASSWORD: ${SHADOW_LOADER_PASSWORD:-shadow-loader-local-only}
+      SHADOW_EXECUTOR_PASSWORD: ${SHADOW_EXECUTOR_PASSWORD:-shadow-executor-local-only}
+    volumes:
+      - shadow_postgres_data:/var/lib/postgresql/data
+      - ./shadow-db/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - shadow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shadow_loader -d shadow_migrapilot"]
+      interval: 5s
+      retries: 15
+      timeout: 5s
+
   api:
     build: ./api
     environment:
@@ -72,6 +90,13 @@ services:
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
       MAX_ZIP_FILES: ${MAX_ZIP_FILES:-50}
       MAX_ZIP_UNCOMPRESSED_BYTES: ${MAX_ZIP_UNCOMPRESSED_BYTES:-52428800}
+      SHADOW_LOADER_URL: postgresql://shadow_loader:${SHADOW_LOADER_PASSWORD:-shadow-loader-local-only}@shadow-db:5432/shadow_migrapilot
+      SHADOW_EXECUTOR_URL: postgresql://shadow_executor:${SHADOW_EXECUTOR_PASSWORD:-shadow-executor-local-only}@shadow-db:5432/shadow_migrapilot
+      SHADOW_STATEMENT_TIMEOUT_MS: ${SHADOW_STATEMENT_TIMEOUT_MS:-5000}
+      SHADOW_JOB_TIMEOUT_SECONDS: ${SHADOW_JOB_TIMEOUT_SECONDS:-30}
+      SHADOW_MAX_ROWS: ${SHADOW_MAX_ROWS:-1000}
+      SHADOW_MISMATCH_SAMPLE_LIMIT: ${SHADOW_MISMATCH_SAMPLE_LIMIT:-25}
+      SHADOW_DECIMAL_TOLERANCE: ${SHADOW_DECIMAL_TOLERANCE:-0.0001}
     command: celery -A app.worker.celery_app.celery_app worker --loglevel=info
     volumes:
       - ./api:/app
@@ -80,6 +105,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      shadow-db:
+        condition: service_healthy
+    networks:
+      - default
+      - shadow
 
   web:
     build: ./web
@@ -95,3 +125,8 @@ services:
 
 volumes:
   postgres_data:
+  shadow_postgres_data:
+
+networks:
+  shadow:
+    internal: true

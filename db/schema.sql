@@ -89,15 +89,23 @@ CREATE TABLE connections (
 
 CREATE TABLE shadow_runs (
   id               BIGSERIAL PRIMARY KEY,
+  project_id       BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  mapping_id       BIGINT NOT NULL REFERENCES mappings(id) ON DELETE CASCADE,
   conversion_id    BIGINT NOT NULL REFERENCES conversions(id) ON DELETE CASCADE,
-  legacy_table     VARCHAR(255) NOT NULL,
-  new_table        VARCHAR(255) NOT NULL,
-  pk_columns       TEXT[] NOT NULL,
+  owner_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  fixture_id       VARCHAR(100) NOT NULL,
   status           VARCHAR(20) NOT NULL DEFAULT 'queued'
-                   CHECK (status IN ('queued','running','passed','failed','error')),
-  match_score      NUMERIC(5,2),
+                   CHECK (status IN ('queued','running','completed','failed')),
+  comparison_result VARCHAR(10) CHECK (comparison_result IS NULL OR comparison_result IN ('PASS','FAIL')),
+  reference_row_count INT, migrated_row_count INT, matched_rows INT,
+  missing_rows INT, unexpected_rows INT, duplicate_key_mismatches INT,
+  column_mismatches INT, null_mismatches INT, numeric_precision_differences INT,
+  mismatch_samples JSONB NOT NULL DEFAULT '[]'::jsonb,
+  execution_time_ms INT,
+  error TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   started_at       TIMESTAMPTZ,
-  finished_at      TIMESTAMPTZ
+  completed_at     TIMESTAMPTZ
 );
 
 CREATE TABLE diff_results (

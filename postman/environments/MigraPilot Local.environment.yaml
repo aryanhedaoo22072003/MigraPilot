@@ -14,3 +14,11 @@ values:
     value: ''
   - key: mapping_id
     value: ''
+  - key: conversion_id
+    value: ''
+  - key: shadow_run_id
+    value: ''
+  - key: autopsy_id
+    value: ''
+  - key: other_token
+    secret: true

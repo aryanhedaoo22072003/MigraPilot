@@ -1,5 +1,8 @@
 import asyncio
 from datetime import datetime, timezone
+import logging
+
+from billiard.exceptions import SoftTimeLimitExceeded
 
 from app.database import SessionLocal, engine
 from app.core.config import settings
@@ -7,7 +10,11 @@ from app.services.parse_upload import parse_and_persist_upload
 from app.models import Conversion, ShadowRun
 from app.services.shadow_execution import ShadowExecutionError, ShadowTimeout, execute_and_compare
 from app.services.shadow_fixtures import get_fixture
+from app.ai_service import AIService
+from app.services.autopsy import persist_autopsy_failure, process_autopsy
 from app.worker.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="migrapilot.parse_upload")
@@ -59,3 +66,42 @@ def shadow_run_task(shadow_run_id: int) -> None:
             await engine.dispose()
 
     asyncio.run(run())
+
+
+async def _run_autopsy_once(autopsy_id: int) -> None:
+    ai_service = AIService.from_settings()
+    try:
+        async with SessionLocal() as db:
+            await process_autopsy(db, autopsy_id, ai_service)
+    finally:
+        try:
+            await asyncio.wait_for(ai_service.aclose(), timeout=5)
+        except Exception:
+            logger.warning("autopsy_provider_cleanup_failed autopsy_id=%s", autopsy_id)
+        await engine.dispose()
+
+
+async def _record_autopsy_soft_timeout(autopsy_id: int) -> None:
+    # The interrupted loop may have held a checked-out connection. Dispose the
+    # pool first, then use a new session/transaction solely for terminal state.
+    await engine.dispose()
+    async with SessionLocal() as db:
+        await persist_autopsy_failure(db, autopsy_id, "task_soft_timeout")
+    await engine.dispose()
+
+
+def _run_autopsy_task_boundary(autopsy_id: int) -> None:
+    try:
+        asyncio.run(_run_autopsy_once(autopsy_id))
+    except SoftTimeLimitExceeded:
+        logger.warning("autopsy_task_soft_timeout autopsy_id=%s", autopsy_id)
+        asyncio.run(_record_autopsy_soft_timeout(autopsy_id))
+
+
+@celery_app.task(
+    name="migrapilot.autopsy",
+    soft_time_limit=settings.ai_autopsy_task_soft_limit_seconds,
+    time_limit=settings.ai_autopsy_task_hard_limit_seconds,
+)
+def autopsy_task(autopsy_id: int) -> None:
+    _run_autopsy_task_boundary(autopsy_id)

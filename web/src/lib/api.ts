@@ -37,6 +37,38 @@ export type ShadowRun = {
   created_at: string; started_at: string | null; completed_at: string | null;
 }
 
+export type AutopsyStatus = 'queued' | 'running' | 'completed' | 'failed'
+export type AutopsyDiagnosisCategory =
+  | 'EXPRESSION_MISMATCH' | 'FILTER_MISMATCH' | 'NULL_SEMANTICS' | 'DATA_TYPE_CONVERSION'
+  | 'DECIMAL_PRECISION' | 'JOIN_BEHAVIOR' | 'LOOKUP_BEHAVIOR' | 'DUPLICATE_KEYS'
+  | 'MISSING_ROWS' | 'UNEXPECTED_ROWS' | 'SQL_EXECUTION' | 'UNSUPPORTED_TRANSFORMATION'
+  | 'UNKNOWN' | 'NEEDS_MORE_EVIDENCE'
+export type AutopsyEvidence = { reference: string; observation: string }
+export type AutopsyDiagnosis = {
+  summary: string
+  diagnosis_category: AutopsyDiagnosisCategory
+  suspected_root_cause: string
+  observed_facts: string[]
+  hypotheses: string[]
+  affected_transformations: string[]
+  affected_columns: string[]
+  supporting_evidence: AutopsyEvidence[]
+  confidence: number
+  confidence_reasons: string[]
+  suggested_corrective_actions: string[]
+  suggested_sql: string | null
+  risks_and_limitations: string[]
+  recommended_verification_steps: string[]
+  more_evidence_required: boolean
+}
+export type AutopsyRecord = {
+  id: number; shadow_run_id: number; project_id: number; mapping_id: number; conversion_id: number
+  status: AutopsyStatus; diagnosis_category: AutopsyDiagnosisCategory | null; diagnosis_json: AutopsyDiagnosis | null
+  confidence: number | null; evidence: AutopsyEvidence[]; suggested_corrections: string[]; suggested_sql: string | null
+  suggested_sql_verified: boolean; model_used: string | null; input_tokens: number; output_tokens: number
+  provider_error: string | null; created_at: string; started_at: string | null; completed_at: string | null
+}
+
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1', timeout: 20000 })
 api.interceptors.request.use(config => {
   const token = sessionStorage.getItem('migrapilot_token')
@@ -52,4 +84,16 @@ export function getErrorMessage(error: unknown): string {
     return error.response ? `Request failed (${error.response.status})` : 'Cannot connect to API. Check that Docker services are running.'
   }
   return 'Something went wrong. Please try again.'
+}
+
+export async function startAutopsy(shadowRunId: number): Promise<AutopsyRecord> {
+  return (await api.post<AutopsyRecord>(`/shadow-runs/${shadowRunId}/autopsies`)).data
+}
+
+export async function getAutopsy(autopsyId: number): Promise<AutopsyRecord> {
+  return (await api.get<AutopsyRecord>(`/autopsies/${autopsyId}`)).data
+}
+
+export async function listAutopsies(shadowRunId: number): Promise<AutopsyRecord[]> {
+  return (await api.get<AutopsyRecord[]>(`/shadow-runs/${shadowRunId}/autopsies`)).data
 }

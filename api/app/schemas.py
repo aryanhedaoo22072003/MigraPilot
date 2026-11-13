@@ -1,6 +1,8 @@
 from datetime import datetime
 import re
-from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from typing import Literal
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class RegisterRequest(BaseModel):
@@ -256,3 +258,181 @@ class ShadowRunResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
+
+AutopsyCategory = Literal[
+    "EXPRESSION_MISMATCH", "FILTER_MISMATCH", "NULL_SEMANTICS",
+    "DATA_TYPE_CONVERSION", "DECIMAL_PRECISION", "JOIN_BEHAVIOR",
+    "LOOKUP_BEHAVIOR", "DUPLICATE_KEYS", "MISSING_ROWS",
+    "UNEXPECTED_ROWS", "SQL_EXECUTION", "UNSUPPORTED_TRANSFORMATION",
+    "UNKNOWN", "NEEDS_MORE_EVIDENCE",
+]
+
+
+class AutopsyEvidenceReference(BaseModel):
+    reference: str = Field(min_length=3, max_length=300)
+    observation: str = Field(min_length=3, max_length=1000)
+
+
+class AutopsyAIOutput(BaseModel):
+    summary: str = Field(min_length=10, max_length=2000)
+    diagnosis_category: AutopsyCategory
+    suspected_root_cause: str = Field(min_length=10, max_length=4000)
+    observed_facts: list[str] = Field(min_length=1, max_length=30)
+    hypotheses: list[str] = Field(min_length=1, max_length=20)
+    affected_transformations: list[str] = Field(default_factory=list, max_length=100)
+    affected_columns: list[str] = Field(default_factory=list, max_length=200)
+    supporting_evidence: list[AutopsyEvidenceReference] = Field(min_length=1, max_length=50)
+    confidence: int = Field(ge=0, le=100)
+    confidence_reasons: list[str] = Field(min_length=1, max_length=20)
+    suggested_corrective_actions: list[str] = Field(min_length=1, max_length=20)
+    suggested_sql: str | None = Field(default=None, max_length=50_000)
+    risks_and_limitations: list[str] = Field(min_length=1, max_length=20)
+    recommended_verification_steps: list[str] = Field(min_length=1, max_length=20)
+    more_evidence_required: bool
+
+    @field_validator(
+        "observed_facts", "hypotheses", "affected_transformations", "affected_columns",
+        "confidence_reasons", "suggested_corrective_actions", "risks_and_limitations",
+        "recommended_verification_steps",
+    )
+    @classmethod
+    def bounded_clean_strings(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values if value.strip()]
+        if any(len(value) > 1000 for value in cleaned):
+            raise ValueError("Autopsy list entries must not exceed 1000 characters")
+        return cleaned
+
+    @field_validator("suggested_sql")
+    @classmethod
+    def safe_unverified_sql(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        normalized = re.sub(r"\{\{.*?\}\}", "", stripped, flags=re.DOTALL).lstrip()
+        if not re.match(r"^(WITH|SELECT)\b", normalized, flags=re.IGNORECASE):
+            raise ValueError("Suggested SQL must be a complete read-only SELECT or WITH query")
+        if re.search(r"\b(INSERT|UPDATE|DELETE|MERGE|DROP|ALTER|TRUNCATE|GRANT|REVOKE|CREATE|CALL|COPY)\b", normalized, flags=re.IGNORECASE):
+            raise ValueError("Suggested SQL contains a prohibited write, DDL, or execution statement")
+        if ";" in stripped.rstrip(";"):
+            raise ValueError("Suggested SQL must contain exactly one statement")
+        return stripped
+
+    @model_validator(mode="after")
+    def required_diagnostic_lists_are_not_blank(self):
+        required = (
+            self.observed_facts, self.hypotheses, self.confidence_reasons,
+            self.suggested_corrective_actions, self.risks_and_limitations,
+            self.recommended_verification_steps,
+        )
+        if any(not values for values in required):
+            raise ValueError("Required Autopsy diagnostic lists must contain non-blank entries")
+        return self
+
+
+class AutopsyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    shadow_run_id: int
+    project_id: int
+    mapping_id: int
+    conversion_id: int
+    status: str
+    diagnosis_category: str | None
+    diagnosis_json: AutopsyAIOutput | None
+    confidence: int | None
+    evidence: list
+    suggested_corrections: list
+    suggested_sql: str | None
+    suggested_sql_verified: bool = False
+    model_used: str | None
+    input_tokens: int
+    output_tokens: int
+    provider_error: str | None
+    created_at: datetime
+    started_at: datetime | None
+    completed_at: datetime | None
+
+
+KnowledgeStatus = Literal["draft", "verified", "published", "rejected", "archived"]
+
+
+class KnowledgeVerificationRequest(BaseModel):
+    passing_shadow_run_id: int = Field(gt=0)
+
+
+class KnowledgeReviewRequest(BaseModel):
+    decision: Literal["approve", "reject", "archive"]
+    notes: str = Field(min_length=3, max_length=4000)
+
+    @field_validator("notes")
+    @classmethod
+    def clean_notes(cls, value: str) -> str:
+        return value.strip()
+
+
+class KnowledgeEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    actor_id: int
+    event_type: str
+    from_status: str | None
+    to_status: str
+    notes: str | None
+    evidence_snapshot: dict | None
+    created_at: datetime
+
+
+class KnowledgeCandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    project_id: int
+    mapping_id: int
+    owner_id: int
+    source_autopsy_id: int
+    original_shadow_run_id: int
+    original_conversion_id: int
+    corrected_conversion_id: int | None
+    corrected_conversion_version: int | None
+    passing_shadow_run_id: int | None
+    diagnosis_category: str
+    transformation_identifiers: list[str]
+    affected_columns: list[str]
+    signature_metadata: dict
+    root_cause_summary: str
+    suggested_corrective_actions: list[str]
+    verified_remediation_summary: str | None
+    fixture_id: str
+    verification_outcome: str | None
+    verification_scope: str | None
+    verification_evidence: dict | None
+    status: KnowledgeStatus
+    reviewer_id: int | None
+    review_notes: str | None
+    created_at: datetime
+    verified_at: datetime | None
+    approved_at: datetime | None
+    published_at: datetime | None
+    archived_at: datetime | None
+    events: list[KnowledgeEventResponse] = Field(default_factory=list)
+
+
+class KnowledgeCandidateListResponse(BaseModel):
+    items: list[KnowledgeCandidateResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class KnowledgeSuggestionResponse(BaseModel):
+    knowledge_id: int
+    diagnosis_category: str
+    relevance: Literal["HIGH", "MEDIUM", "LOW"]
+    reasons: list[str]
+    root_cause_summary: str
+    suggested_corrective_actions: list[str]
+    verified_remediation_summary: str
+    fixture_id: str
+    corrected_conversion_version: int
+    published_at: datetime
+    advisory: str = "Relevant verified knowledge is advisory and does not prove this fix applies."

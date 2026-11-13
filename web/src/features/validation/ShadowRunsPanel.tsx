@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Clock3, FlaskConical, LoaderCircle, Play, RefreshCw, ShieldAlert, XCircle } from 'lucide-react'
 import { api, getErrorMessage, type ShadowMismatchSample, type ShadowRun } from '../../lib/api'
+import AutopsyPanel from './AutopsyPanel'
 
 const FIXTURE_ID = 'orders_discount_v1'
 const active = (run?: ShadowRun) => run?.status === 'queued' || run?.status === 'running'
@@ -30,7 +31,7 @@ function sampleLabel(sample: ShadowMismatchSample) {
   return 'Mismatch detail'
 }
 
-export default function ShadowRunsPanel({ conversionId, version, dirty, pollIntervalMs = 3000 }: { conversionId: number; version: number; dirty: boolean; pollIntervalMs?: number }) {
+export default function ShadowRunsPanel({ conversionId, version, dirty, originalSql = '', pollIntervalMs = 3000 }: { conversionId: number; version: number; dirty: boolean; originalSql?: string; pollIntervalMs?: number }) {
   const queryClient = useQueryClient()
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null)
   const terminalRefresh = useRef<number | null>(null)
@@ -101,6 +102,7 @@ export default function ShadowRunsPanel({ conversionId, version, dirty, pollInte
             {run.comparison_result === 'PASS' ? <div className="shadow-pass-summary"><CheckCircle2 size={18} /><div><strong>Reference and migrated output match</strong><p>All {run.matched_rows ?? 0} business-key rows matched within the configured decimal tolerance.</p></div></div>
             : <div className="shadow-mismatches"><div className="shadow-section-title"><span>Mismatch explorer</span><small>{run.mismatch_samples.length} bounded samples</small></div>{run.mismatch_samples.length ? run.mismatch_samples.map((sample, index) => <details key={index}><summary><span>{sampleLabel(sample)}</span><code>{sample.key?.map(String).join(' · ') || `sample ${index + 1}`}</code></summary><dl>{sample.kind && <><dt>Kind</dt><dd>{sample.kind}</dd></>}{sample.column && <><dt>Column</dt><dd>{sample.column}</dd></>} {'expected' in sample && <><dt>Expected</dt><dd>{String(sample.expected ?? 'NULL')}</dd></>} {'actual' in sample && <><dt>Actual</dt><dd>{String(sample.actual ?? 'NULL')}</dd></>}</dl></details>) : <p className="shadow-no-samples">Mismatch counters were returned without row samples.</p>}</div>}
           </>}
+          <AutopsyPanel key={run.id} run={run} originalSql={originalSql} />
         </> : null}
       </section>
     </div>

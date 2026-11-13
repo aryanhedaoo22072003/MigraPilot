@@ -1,0 +1,69 @@
+{
+  "info": {
+    "_postman_id": "a68e91cf-b27d-46d1-b843-phase6aautopsy",
+    "name": "MigraPilot Phase 6A — AI Autopsy",
+    "description": "Authenticated AI Autopsy checks. Use only a genuine completed FAIL or sanitized failed shadow run. Provider credentials remain server-side.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Start AI Autopsy",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{base_url}}/shadow-runs/{{shadow_run_id}}/autopsies", "host": ["{{base_url}}"], "path": ["shadow-runs", "{{shadow_run_id}}", "autopsies"]},
+        "description": "Queues exactly one diagnosis for an eligible FAIL/failed run. No request body and no automatic provider retry from Postman."
+      },
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('Accepted', () => pm.response.to.have.status(202));",
+        "if (pm.response.code === 202) { const body = pm.response.json(); pm.environment.set('autopsy_id', body.id); pm.expect(body.status).to.eql('queued'); }"
+      ], "type": "text/javascript"}}]
+    },
+    {
+      "name": "Poll AI Autopsy",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{base_url}}/autopsies/{{autopsy_id}}", "host": ["{{base_url}}"], "path": ["autopsies", "{{autopsy_id}}"]}
+      },
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('Report is available', () => pm.response.to.have.status(200));",
+        "if (pm.response.code === 200) { const body = pm.response.json(); pm.expect(['queued','running','completed','failed']).to.include(body.status); if (body.status === 'completed') { pm.expect(body.diagnosis_json).to.be.an('object'); pm.expect(body.suggested_sql_verified).to.eql(false); } }"
+      ], "type": "text/javascript"}}]
+    },
+    {
+      "name": "List AI Autopsy history",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{base_url}}/shadow-runs/{{shadow_run_id}}/autopsies", "host": ["{{base_url}}"], "path": ["shadow-runs", "{{shadow_run_id}}", "autopsies"]}
+      },
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('History is newest-first', () => { pm.response.to.have.status(200); const rows = pm.response.json(); pm.expect(rows).to.be.an('array'); for (let i=1;i<rows.length;i++) pm.expect(rows[i-1].id).to.be.above(rows[i].id); });"], "type": "text/javascript"}}]
+    },
+    {
+      "name": "Reject PASS Shadow Run",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{base_url}}/shadow-runs/2/autopsies", "host": ["{{base_url}}"], "path": ["shadow-runs", "2", "autopsies"]},
+        "description": "Uses the preserved PASS run 2 from the documented development dataset."
+      },
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('PASS is rejected', () => { pm.response.to.have.status(422); pm.expect(pm.response.json().detail).to.include('PASS'); });"], "type": "text/javascript"}}]
+    },
+    {
+      "name": "Missing JWT",
+      "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}/autopsies/{{autopsy_id}}", "host": ["{{base_url}}"], "path": ["autopsies", "{{autopsy_id}}"]}},
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('Authentication required', () => pm.response.to.have.status(401));"], "type": "text/javascript"}}]
+    },
+    {
+      "name": "Ownership isolation",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{other_token}}", "type": "text"}],
+        "url": {"raw": "{{base_url}}/autopsies/{{autopsy_id}}", "host": ["{{base_url}}"], "path": ["autopsies", "{{autopsy_id}}"]},
+        "description": "Set other_token to a second local user's JWT. The API intentionally returns 404 to avoid resource disclosure."
+      },
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('Other owner cannot see report', () => pm.response.to.have.status(404));"], "type": "text/javascript"}}]
+    }
+  ]
+}

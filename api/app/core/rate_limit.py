@@ -33,3 +33,4 @@ class SlidingWindowRateLimiter:
 
 
 ai_conversion_limiter = SlidingWindowRateLimiter()
+ai_autopsy_limiter = SlidingWindowRateLimiter()

@@ -1,0 +1,13 @@
+$kind: http-request
+name: http://localhost:8000/api/v1/shadow-runs/15/autopsies
+description: ""
+url: http://localhost:8000/api/v1/shadow-runs/15/autopsies
+method: POST
+body:
+  type: json
+  content: ""
+auth:
+  type: bearer
+  credentials:
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzk0MzAzMTQ0LCJleHAiOjE3OTQzMDY3NDR9.EB04bdc_yKPz0lOv9N1Cm-p2hV4H5okoVZPt1a5Mm_o
+order: 12000

@@ -129,17 +129,35 @@ CREATE TABLE row_diffs (
 
 CREATE TABLE autopsies (
   id              BIGSERIAL PRIMARY KEY,
+  project_id      BIGINT REFERENCES projects(id) ON DELETE CASCADE,
   mapping_id      BIGINT NOT NULL REFERENCES mappings(id) ON DELETE CASCADE,
   shadow_run_id   BIGINT REFERENCES shadow_runs(id),
-  trigger_type    VARCHAR(20) NOT NULL CHECK (trigger_type IN ('auto','manual_log','mismatch')),
+  conversion_id   BIGINT REFERENCES conversions(id) ON DELETE CASCADE,
+  owner_id        BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  trigger_type    VARCHAR(20) CHECK (trigger_type IN ('auto','manual_log','mismatch')),
   raw_log         TEXT,
-  root_cause      TEXT NOT NULL,
-  evidence        JSONB,
+  root_cause      TEXT,
+  diagnosis_category VARCHAR(50),
+  diagnosis_json  JSONB,
+  evidence        JSONB NOT NULL DEFAULT '[]'::jsonb,
   suggested_fix   TEXT,
+  suggested_corrections JSONB NOT NULL DEFAULT '[]'::jsonb,
+  suggested_sql   TEXT,
   confidence      SMALLINT,
-  status          VARCHAR(20) NOT NULL DEFAULT 'open'
-                  CHECK (status IN ('open','fix_applied','resolved','dismissed')),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+  status          VARCHAR(20) NOT NULL DEFAULT 'queued'
+                  CHECK (status IN ('queued','running','completed','failed','open','fix_applied','resolved','dismissed')),
+  model_used      VARCHAR(100),
+  input_tokens    INT NOT NULL DEFAULT 0,
+  output_tokens   INT NOT NULL DEFAULT 0,
+  provider_error  VARCHAR(100),
+  celery_task_id  VARCHAR(50) UNIQUE,
+  heartbeat_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  started_at      TIMESTAMPTZ,
+  completed_at    TIMESTAMPTZ,
+  CHECK (confidence IS NULL OR confidence BETWEEN 0 AND 100),
+  CHECK (status IN ('open','fix_applied','resolved','dismissed') OR
+    (shadow_run_id IS NOT NULL AND project_id IS NOT NULL AND mapping_id IS NOT NULL AND conversion_id IS NOT NULL AND owner_id IS NOT NULL))
 );
 
 CREATE TABLE failure_knowledge (
@@ -150,6 +168,58 @@ CREATE TABLE failure_knowledge (
   times_seen    INT NOT NULL DEFAULT 1,
   embedding     vector(1536)
 );
+
+-- Phase 7A verified knowledge. The legacy failure_knowledge placeholder above is
+-- retained for migration compatibility and is not used for publication.
+CREATE TABLE knowledge_candidates (
+  id BIGSERIAL PRIMARY KEY,
+  project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  mapping_id BIGINT NOT NULL REFERENCES mappings(id) ON DELETE CASCADE,
+  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_autopsy_id BIGINT NOT NULL REFERENCES autopsies(id) ON DELETE RESTRICT,
+  original_shadow_run_id BIGINT NOT NULL REFERENCES shadow_runs(id) ON DELETE RESTRICT,
+  original_conversion_id BIGINT NOT NULL REFERENCES conversions(id) ON DELETE RESTRICT,
+  corrected_conversion_id BIGINT REFERENCES conversions(id) ON DELETE RESTRICT,
+  corrected_conversion_version INT,
+  passing_shadow_run_id BIGINT REFERENCES shadow_runs(id) ON DELETE RESTRICT,
+  diagnosis_category VARCHAR(50) NOT NULL,
+  transformation_identifiers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  affected_columns JSONB NOT NULL DEFAULT '[]'::jsonb,
+  signature_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  root_cause_summary TEXT NOT NULL,
+  suggested_corrective_actions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  verified_remediation_summary TEXT,
+  fixture_id VARCHAR(100) NOT NULL,
+  verification_outcome VARCHAR(30) CHECK (verification_outcome IS NULL OR verification_outcome='PASS'),
+  verification_scope VARCHAR(300),
+  verification_evidence JSONB,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','verified','published','rejected','archived')),
+  reviewer_id BIGINT REFERENCES users(id) ON DELETE RESTRICT,
+  review_notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  verified_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  published_at TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  CONSTRAINT uq_knowledge_project_autopsy UNIQUE (project_id, source_autopsy_id)
+);
+
+CREATE TABLE knowledge_events (
+  id BIGSERIAL PRIMARY KEY,
+  candidate_id BIGINT NOT NULL REFERENCES knowledge_candidates(id) ON DELETE CASCADE,
+  actor_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  event_type VARCHAR(30) NOT NULL,
+  from_status VARCHAR(20),
+  to_status VARCHAR(20) NOT NULL,
+  notes TEXT,
+  evidence_snapshot JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_knowledge_project_status ON knowledge_candidates(project_id, status, created_at);
+CREATE INDEX idx_knowledge_mapping ON knowledge_candidates(mapping_id);
+CREATE INDEX idx_knowledge_category ON knowledge_candidates(project_id, diagnosis_category);
+CREATE INDEX idx_knowledge_events_candidate ON knowledge_events(candidate_id, created_at);
 
 CREATE TABLE chat_messages (
   id          BIGSERIAL PRIMARY KEY,
@@ -177,6 +247,9 @@ CREATE INDEX idx_jobs_upload ON jobs(upload_id);
 CREATE INDEX idx_transformations_mapping ON transformations(mapping_id);
 CREATE INDEX idx_conversions_mapping ON conversions(mapping_id);
 CREATE INDEX idx_autopsies_mapping ON autopsies(mapping_id);
+CREATE INDEX idx_autopsies_shadow_created ON autopsies(shadow_run_id, created_at);
+CREATE UNIQUE INDEX uq_autopsies_active_shadow ON autopsies(shadow_run_id)
+  WHERE status IN ('queued','running');
 CREATE INDEX idx_failure_embedding ON failure_knowledge
   USING ivfflat (embedding vector_cosine_ops);
 

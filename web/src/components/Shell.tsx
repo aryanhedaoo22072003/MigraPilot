@@ -32,13 +32,13 @@ export default function Shell() {
           <NavLink end to="/app/projects" onClick={() => setMenuOpen(false)} className={navItem}><FolderKanban size={18} /> My Projects</NavLink>
           <Link to={lineageHref} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition ${lineageActive ? 'bg-violet-400/10 text-violet-200' : 'text-slate-400 hover:bg-[#1b2135] hover:text-slate-100'}`}><Activity size={18} /> ETL Lineage</Link>
         </nav>
-        <div className="mt-10 px-3 text-[10px] font-extrabold uppercase tracking-[.25em] text-slate-600">Coming next</div>
+        <div className="mt-10 px-3 text-[10px] font-extrabold uppercase tracking-[.25em] text-slate-600">Integrated tools</div>
         <div className="mt-4 space-y-1 text-sm">
-          <div className="flex items-center gap-3 px-3.5 py-3 text-slate-600"><Sparkles size={18} /> AI Autopsy</div>
+          <div className="flex items-center gap-3 px-3.5 py-3 text-slate-400" title="Available in a mapping's Validation tab"><Sparkles size={18} className="text-violet-300" /> AI Autopsy <span className="ml-auto text-[9px] font-bold uppercase tracking-wider text-emerald-400">Live</span></div>
           <div className="flex items-center gap-3 px-3.5 py-3 text-slate-600"><Settings2 size={18} /> Connections</div>
         </div>
         <div className="mt-auto space-y-4 px-2">
-          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Phase 5 active</div><p className="mt-2 text-xs leading-5 text-slate-400">AI SQL versions and isolated validation reports are ready.</p></div>
+          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Phase 6 active</div><p className="mt-2 text-xs leading-5 text-slate-400">AI SQL, validation, and evidence-backed Autopsy reports are integrated.</p></div>
           <Link to="/" className="flex items-center gap-2 px-2 text-xs text-slate-500 hover:text-white"><ArrowLeft size={14} /> Back to website</Link>
         </div>
       </aside>
@@ -49,7 +49,7 @@ export default function Shell() {
           <div className="flex items-center gap-3"><button className="btn-primary hidden text-xs sm:flex" onClick={() => setCreateOpen(true)}><Plus size={15} /> New project</button><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/20 text-sm font-extrabold text-violet-200">{user?.email?.[0]?.toUpperCase() || '?'}</div><span className="hidden max-w-[160px] truncate text-xs font-semibold text-slate-300 xl:inline">{user?.email}</span><ChevronDown size={14} className="hidden text-slate-500 xl:inline" /><button onClick={() => { logout(); navigate('/login') }} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-800 hover:text-white" title="Sign out" aria-label="Sign out"><LogOut size={17} /></button></div>
         </header>
         <main className="mx-auto max-w-[1500px] px-5 py-9 sm:px-8 lg:px-10"><Outlet context={{ openCreateProject: () => setCreateOpen(true) }} /></main>
-        <footer className="mx-auto flex max-w-[1500px] flex-wrap justify-between gap-3 px-5 pb-8 text-xs text-slate-600 sm:px-8 lg:px-10"><span>MigraPilot · PostgreSQL + FastAPI</span><span className="flex items-center gap-2"><Github size={13} /> Phase 5 validation workspace</span></footer>
+        <footer className="mx-auto flex max-w-[1500px] flex-wrap justify-between gap-3 px-5 pb-8 text-xs text-slate-600 sm:px-8 lg:px-10"><span>MigraPilot · PostgreSQL + FastAPI</span><span className="flex items-center gap-2"><Github size={13} /> Phase 6 validation and Autopsy workspace</span></footer>
       </div>
     </div>
     {createOpen && <CreateProjectModal onClose={() => setCreateOpen(false)} />}

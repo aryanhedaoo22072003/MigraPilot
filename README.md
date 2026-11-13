@@ -1,4 +1,4 @@
-# MigraPilot — through Phase 5A shadow-run backend
+# MigraPilot — through Phase 6A AI Autopsy backend
 
 > **Convert it. Prove it. Fix it.**
 >
@@ -70,6 +70,9 @@ docker compose down
 | POST | `/conversions/{id}/shadow-runs` | Owner + Engineer/Admin | Queue an isolated synthetic-data comparison |
 | GET | `/shadow-runs/{id}` | Owner | Poll status and retrieve the bounded comparison report |
 | GET | `/conversions/{id}/shadow-runs` | Owning project | List prior shadow runs newest first |
+| POST | `/shadow-runs/{id}/autopsies` | Owner + Engineer/Admin | Queue a diagnosis for a genuine FAIL or sanitized execution failure |
+| GET | `/autopsies/{id}` | Owner | Poll a persisted structured diagnosis |
+| GET | `/shadow-runs/{id}/autopsies` | Owner | List immutable diagnosis history newest first |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -123,7 +126,7 @@ migrapilot-starter/
 
 ## Scope / product honesty
 
-The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. Phase 4 generates review-only dbt SQL and schema documentation. Phase 5 compares that SQL against its controlled synthetic fixture in an isolated shadow database and displays persisted reports in the conversion workspace. External warehouse connections, production-row comparisons and AI Autopsy are not implemented.
+The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. Phase 4 generates review-only dbt SQL and schema documentation. Phase 5 compares that SQL against its controlled synthetic fixture in an isolated shadow database and displays persisted reports in the conversion workspace. Phase 6A can diagnose genuine persisted failures with bounded metadata-only evidence. External warehouse connections, production-row comparisons, automatic repair and the Autopsy frontend are not implemented.
 
 ## Phase 3 lineage UI
 
@@ -157,6 +160,31 @@ Start the complete stack with `docker compose up -d --build`. Set separate `SHAD
 
 Open a mapping conversion and select **Validation** beside **Code & review**. The workspace lists saved-version shadow runs, polls queued/running reports every three seconds, and stops at completed or failed. PASS, comparison FAIL and execution failure are visually distinct. The dashboard renders only persisted API metrics and bounded mismatch samples. Starting validation always uses the selected immutable conversion; an unsaved Monaco draft is clearly excluded.
 
+## Phase 6A AI Autopsy backend
+
+AI Autopsy accepts only completed comparison `FAIL` runs or failed shadow executions with a sanitized error category. The authenticated API persists a queued record and a Celery worker builds bounded evidence from immutable conversion SQL, PowerCenter transformations/ports/expressions, connector lineage and aggregate mismatch metrics. Raw mismatch values, keys, credentials, connection strings, JWTs and provider secrets are excluded. Gemini/Anthropic structured output uses the existing provider adapter and reduced Gemini-side schema; Pydantic, evidence-reference checks and read-only suggested-SQL checks remain authoritative locally.
+
+Autopsy output is advisory. Suggested SQL is marked unverified, is never executed, never overwrites a conversion, and never creates a replacement version. Provider failures are stored only as safe categories. Configure `AI_AUTOPSY_RATE_LIMIT_PER_MINUTE` and the `AUTOPSY_MAX_*` evidence bounds through server environment variables.
+
+Autopsy provider work has a total wall-clock budget (`AI_AUTOPSY_REQUEST_BUDGET_SECONDS`, default 45), independent of the provider SDK's per-attempt timeout. The Celery soft/hard limits default to 60/70 seconds, leaving bounded time for validation, provider-client closure, terminal-state persistence and connection cleanup. The SDK may retry configured transient HTTP failures only inside that total budget. Soft task timeouts are caught and persisted as `task_soft_timeout` using a fresh transaction.
+
+Running records older than `AI_AUTOPSY_STALE_AFTER_SECONDS` (default 300) can be recovered only with the explicit guarded command below. It first requires successful responses from Celery's active, reserved and scheduled inspections, and refuses to recover a task that is live or not yet stale:
+
+```bash
+docker compose exec worker python -m app.cli.recover_stale_autopsies \
+  --autopsy-id AUTOPSY_ID --reason worker_interrupted_stale \
+  --confirm-stale-recovery
+```
+
+For a genuine deterministic FAIL demonstration, run this explicitly after starting the full stack (replace the email with an existing local owner):
+
+```bash
+docker compose exec worker python -m app.cli.seed_phase6a_fail_demo \
+  --owner-email test@migrapilot.dev --confirm-development-only
+```
+
+The command creates/reuses a separate project named **Phase 6A AI Autopsy FAIL Demo**, creates an intentionally wrong `0.80` conversion against a `0.90` reference, and executes it only in `shadow-db`. It prints the new IDs. It is never run at application startup and does not alter Project 6, Mapping 2, conversions 1/2, or existing PASS runs.
+
 ## Phase 2 parser behavior and limits
 
 Uploads are validated before queueing. Defaults limit the HTTP file to 10 MiB, a ZIP to 50 files and 50 MiB uncompressed content, and reject traversal paths, symlinks, suspicious compression ratios, corrupt archives, non-XML members, DTDs and entities. Tune limits with `MAX_UPLOAD_BYTES`, `MAX_ZIP_FILES`, and `MAX_ZIP_UNCOMPRESSED_BYTES`.
@@ -175,7 +203,7 @@ Import `postman/MigraPilot-Phase1.postman_collection.json`, `postman/MigraPilot-
 3. React Flow graph, column-level lineage and inspected transformations. **Implemented.**
 4. Real schema-validated provider-to-dbt code conversion, Monaco editor, usage accounting, PII controls. **Backend conversion implemented with Gemini and Anthropic providers; frontend editor remains pending.**
 5. Read-only connections, shadow run comparisons and diff viewer.
-6. AI Autopsy diagnosis / suggested fixes / applied revisions / reruns.
+6. AI Autopsy diagnosis backend and suggested fixes. **Backend diagnosis implemented; apply-fix loop/frontend deferred.**
 7. Knowledge base embedding retrieval (requires an embeddings provider compatible with pgvector).
 8. Project chat, docs/report generation, production hardening and deployment.
 

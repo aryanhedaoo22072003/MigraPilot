@@ -82,6 +82,10 @@ class AIProviderRequestError(RuntimeError):
     pass
 
 
+class AIProviderTimeoutError(AIProviderRequestError):
+    pass
+
+
 class GeminiProvider:
     def __init__(self, api_key: str, model: str, client=None):
         if client is None:
@@ -114,6 +118,8 @@ class GeminiProvider:
             return AIProviderAuthenticationError("Gemini credentials were rejected")
         if code == 429:
             return AIProviderQuotaError("Gemini quota was exhausted")
+        if isinstance(exc, TimeoutError) or "timeout" in type(exc).__name__.lower():
+            return AIProviderTimeoutError("Gemini request timed out")
         return AIProviderRequestError("Gemini request failed")
 
     @staticmethod
@@ -188,6 +194,9 @@ class GeminiProvider:
             output_tokens=getattr(usage, "total_output_tokens", 0) or 0,
         )
 
+    async def aclose(self) -> None:
+        await self.client.aio.aclose()
+
 
 class AnthropicProvider:
     def __init__(self, api_key: str, model: str):
@@ -225,6 +234,9 @@ class AnthropicProvider:
                 )
         raise AIProviderResponseError("AI provider did not return the required structured tool output")
 
+    async def aclose(self) -> None:
+        await self.client.close()
+
 
 class AIService:
     def __init__(self, provider: StructuredAIProvider | None = None):
@@ -252,6 +264,11 @@ class AIService:
                 message = f"AI conversion is not configured; unsupported AI_PROVIDER '{provider}'"
             raise AIServiceNotConfigured(message)
         return await self.provider.generate(system_prompt, payload, output_type)
+
+    async def aclose(self) -> None:
+        close = getattr(self.provider, "aclose", None)
+        if close is not None:
+            await close()
 
 
 def get_ai_service() -> AIService:

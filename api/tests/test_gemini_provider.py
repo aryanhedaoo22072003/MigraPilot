@@ -11,7 +11,7 @@ from app.ai_service import (
     GeminiProvider,
     gemini_response_schema,
 )
-from app.schemas import ConversionAIOutput
+from app.schemas import AutopsyAIOutput, ConversionAIOutput
 
 
 VALID_OUTPUT = {
@@ -145,3 +145,44 @@ async def test_gemini_diagnostics_are_safe_and_include_request_id(caplog):
     assert "secret provider response" not in log
     assert "raw prompt" not in log
     assert "private" not in log
+
+
+@pytest.mark.asyncio
+async def test_gemini_autopsy_uses_reduced_schema_and_validates_locally():
+    output = AutopsyAIOutput.model_validate({
+        "summary": "A deterministic output mismatch affects NET_AMOUNT.",
+        "diagnosis_category": "EXPRESSION_MISMATCH",
+        "suspected_root_cause": "The SQL multiplier differs from the mapped expression.",
+        "observed_facts": ["Column mismatches were reported."],
+        "hypotheses": ["The discount multiplier was translated incorrectly."],
+        "affected_transformations": ["EXP_NET"],
+        "affected_columns": ["NET_AMOUNT"],
+        "supporting_evidence": [{"reference": "metrics.column_mismatches", "observation": "The metric is nonzero."}],
+        "confidence": 85,
+        "confidence_reasons": ["Mapping and aggregate evidence agree."],
+        "suggested_corrective_actions": ["Review the immutable conversion and create a corrected version."],
+        "suggested_sql": None,
+        "risks_and_limitations": ["No proposed correction has been executed."],
+        "recommended_verification_steps": ["Run another isolated shadow comparison."],
+        "more_evidence_required": False,
+    })
+    response = SimpleNamespace(
+        output_text=output.model_dump_json(),
+        usage=SimpleNamespace(total_input_tokens=40, total_output_tokens=50),
+    )
+    interactions = SchemaComplexityRejectingInteractions(response=response)
+    provider = GeminiProvider("key", "gemini-test", client_for(interactions))
+    invocation = await provider.generate("prompt", {"shadow_run": {"id": 1}}, AutopsyAIOutput)
+    assert invocation.result == output
+    assert invocation.input_tokens == 40 and invocation.output_tokens == 50
+    assert interactions.calls[0]["store"] is False
+
+
+@pytest.mark.asyncio
+async def test_gemini_timeout_is_bounded_and_not_retried_at_application_layer():
+    interactions = FakeInteractions(error=TimeoutError("private timeout detail"))
+    provider = GeminiProvider("key", "gemini-test", client_for(interactions))
+    with pytest.raises(AIProviderRequestError):
+        await provider.generate("prompt", {"mapping": {}}, ConversionAIOutput)
+    assert len(interactions.calls) == 1
+    assert interactions.calls[0]["timeout"] > 0

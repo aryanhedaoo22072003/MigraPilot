@@ -136,6 +136,86 @@ class ShadowRun(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     conversion: Mapped[Conversion] = relationship(back_populates="shadow_runs")
+    autopsies: Mapped[list["Autopsy"]] = relationship(back_populates="shadow_run", passive_deletes=True)
+
+
+class Autopsy(Base):
+    __tablename__ = "autopsies"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    shadow_run_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shadow_runs.id", ondelete="CASCADE"), nullable=False)
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    mapping_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("mappings.id", ondelete="CASCADE"), nullable=False)
+    conversion_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("conversions.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", server_default="queued")
+    diagnosis_category: Mapped[str | None] = mapped_column(String(50))
+    diagnosis_json: Mapped[dict | None] = mapped_column(JSON)
+    confidence: Mapped[int | None] = mapped_column(SmallInteger)
+    evidence: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    suggested_corrections: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    suggested_sql: Mapped[str | None] = mapped_column(Text)
+    model_used: Mapped[str | None] = mapped_column(String(100))
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    provider_error: Mapped[str | None] = mapped_column(String(100))
+    celery_task_id: Mapped[str | None] = mapped_column(String(50))
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shadow_run: Mapped[ShadowRun] = relationship(back_populates="autopsies")
+
+
+class KnowledgeCandidate(Base):
+    __tablename__ = "knowledge_candidates"
+    __table_args__ = (UniqueConstraint("project_id", "source_autopsy_id", name="uq_knowledge_project_autopsy"),)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    mapping_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("mappings.id", ondelete="CASCADE"), nullable=False)
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_autopsy_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("autopsies.id", ondelete="RESTRICT"), nullable=False)
+    original_shadow_run_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("shadow_runs.id", ondelete="RESTRICT"), nullable=False)
+    original_conversion_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("conversions.id", ondelete="RESTRICT"), nullable=False)
+    corrected_conversion_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("conversions.id", ondelete="RESTRICT"))
+    corrected_conversion_version: Mapped[int | None] = mapped_column(Integer)
+    passing_shadow_run_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("shadow_runs.id", ondelete="RESTRICT"))
+    diagnosis_category: Mapped[str] = mapped_column(String(50), nullable=False)
+    transformation_identifiers: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    affected_columns: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    signature_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
+    root_cause_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    suggested_corrective_actions: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    verified_remediation_summary: Mapped[str | None] = mapped_column(Text)
+    fixture_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    verification_outcome: Mapped[str | None] = mapped_column(String(30))
+    verification_scope: Mapped[str | None] = mapped_column(String(300))
+    verification_evidence: Mapped[dict | None] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft", server_default="draft")
+    reviewer_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"))
+    review_notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    events: Mapped[list["KnowledgeEvent"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan", passive_deletes=True,
+        order_by="KnowledgeEvent.created_at, KnowledgeEvent.id",
+    )
+
+
+class KnowledgeEvent(Base):
+    __tablename__ = "knowledge_events"
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("knowledge_candidates.id", ondelete="CASCADE"), nullable=False)
+    actor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(20))
+    to_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    evidence_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    candidate: Mapped[KnowledgeCandidate] = relationship(back_populates="events")
 
 
 class AIUsage(Base):

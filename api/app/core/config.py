@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,8 +14,13 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-5"
     ai_max_output_tokens: int = 4096
     ai_conversion_rate_limit_per_minute: int = 5
+    ai_autopsy_rate_limit_per_minute: int = 3
     ai_provider_timeout_seconds: float = 60.0
     ai_provider_max_retries: int = 1
+    ai_autopsy_request_budget_seconds: float = 45.0
+    ai_autopsy_task_soft_limit_seconds: int = 60
+    ai_autopsy_task_hard_limit_seconds: int = 70
+    ai_autopsy_stale_after_seconds: int = 300
     mask_pii: bool = True
     max_upload_bytes: int = 10 * 1024 * 1024
     max_zip_files: int = 50
@@ -27,7 +33,23 @@ class Settings(BaseSettings):
     shadow_max_rows: int = 1000
     shadow_mismatch_sample_limit: int = 25
     shadow_decimal_tolerance: str = "0.0001"
+    autopsy_max_sql_chars: int = 50_000
+    autopsy_max_expression_chars: int = 2_000
+    autopsy_max_transformations: int = 100
+    autopsy_max_ports: int = 500
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def validate_autopsy_timeout_envelope(self):
+        if self.ai_autopsy_request_budget_seconds <= 0:
+            raise ValueError("AI Autopsy request budget must be positive")
+        if self.ai_autopsy_request_budget_seconds > self.ai_autopsy_task_soft_limit_seconds - 10:
+            raise ValueError("AI Autopsy request budget must leave at least 10 seconds before the soft task limit")
+        if self.ai_autopsy_task_hard_limit_seconds < self.ai_autopsy_task_soft_limit_seconds + 5:
+            raise ValueError("AI Autopsy hard task limit must be at least 5 seconds above the soft limit")
+        if self.ai_autopsy_stale_after_seconds <= self.ai_autopsy_task_hard_limit_seconds:
+            raise ValueError("AI Autopsy stale threshold must exceed the hard task limit")
+        return self
 
 
 settings = Settings()

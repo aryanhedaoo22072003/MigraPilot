@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.database import get_db
 from app.main import app
-from app.models import Autopsy, Base, Conversion, KnowledgeCandidate, Mapping, Port, ShadowRun, Transformation
+from app.models import AIUsage, Autopsy, Base, Conversion, KnowledgeCandidate, Mapping, Port, ShadowRun, Transformation
 
 
 WRONG_SQL = "with src as (select amount from source_data) select amount * 0.80 as net_amount from src"
@@ -224,3 +224,8 @@ async def test_publish_match_rank_project_isolation_and_archive(knowledge_env):
     assert (await client.get(f"/api/v1/mappings/{ids['mapping']}/knowledge-suggestions", headers=owner)).json() == []
     async with factory() as db:
         assert (await db.scalar(select(KnowledgeCandidate))).status == "archived"
+        assert (await db.get(Conversion, ids["original"])).generated_sql == WRONG_SQL
+        assert (await db.get(Conversion, ids["corrected"])).generated_sql == RIGHT_SQL
+        assert (await db.get(ShadowRun, ids["fail_run"])).comparison_result == "FAIL"
+        assert (await db.get(Autopsy, ids["autopsy"])).status == "completed"
+        assert list(await db.scalars(select(AIUsage))) == []

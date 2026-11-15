@@ -1,0 +1,68 @@
+{
+  "info": {
+    "_postman_id": "9f194182-93c1-4ce5-9f71-phase7aknowledge",
+    "name": "MigraPilot Phase 7A — Verified Failure Knowledge",
+    "description": "Project-scoped verified failure knowledge lifecycle. Run only after creating independent PASS evidence. No request calls Gemini or executes candidate SQL.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Create draft from completed Autopsy",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": {"raw": "{{base_url}}/autopsies/{{source_autopsy_id}}/knowledge-candidates", "host": ["{{base_url}}"], "path": ["autopsies", "{{source_autopsy_id}}", "knowledge-candidates"]},
+        "description": "Creates a DRAFT only. A repeated request returns 409 and never mutates the Autopsy."
+      },
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+        "pm.test('Draft created', () => pm.response.to.have.status(201));",
+        "if (pm.response.code === 201) { const body=pm.response.json(); pm.expect(body.status).to.eql('draft'); pm.environment.set('knowledge_candidate_id', body.id); pm.environment.set('failed_shadow_run_id', body.original_shadow_run_id); }"
+      ]}}]
+    },
+    {
+      "name": "2. Get candidate details and audit history",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}], "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}"]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Candidate provenance available', () => { pm.response.to.have.status(200); const b=pm.response.json(); pm.expect(b.events).to.be.an('array'); pm.expect(b.source_autopsy_id).to.eql(Number(pm.environment.get('source_autopsy_id'))); });"]}}]
+    },
+    {
+      "name": "3. List project knowledge",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}], "url": {"raw": "{{base_url}}/projects/{{project_id}}/knowledge-candidates?limit=50&offset=0", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "knowledge-candidates"], "query": [{"key": "limit", "value": "50"}, {"key": "offset", "value": "0"}]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Bounded project list', () => { pm.response.to.have.status(200); const b=pm.response.json(); pm.expect(b.items).to.be.an('array'); pm.expect(b.limit).to.eql(50); });"]}}]
+    },
+    {
+      "name": "4. Reject publishing unverified candidate",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"decision\": \"approve\",\n  \"notes\": \"Negative test: no independent PASS evidence is attached.\"\n}"}, "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}/review", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}", "review"]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Unverified publication rejected', () => { pm.response.to.have.status(422); pm.expect(pm.response.json().detail).to.include('verified'); });"]}}]
+    },
+    {
+      "name": "5. Attach independent PASS verification",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"passing_shadow_run_id\": {{passing_shadow_run_id}}\n}"}, "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}/verification", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}", "verification"]}, "description": "Requires a different immutable conversion that passed the same fixture with zero mismatches."},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Candidate independently verified', () => { pm.response.to.have.status(200); const b=pm.response.json(); pm.expect(b.status).to.eql('verified'); pm.expect(b.verification_outcome).to.eql('PASS'); });"]}}]
+    },
+    {
+      "name": "6. Approve and publish verified knowledge",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"decision\": \"approve\",\n  \"notes\": \"Reviewed corrected immutable SQL and the same-fixture PASS evidence.\"\n}"}, "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}/review", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}", "review"]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Verified record published', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('published'); });"]}}]
+    },
+    {
+      "name": "7. Search relevant published knowledge",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}], "url": {"raw": "{{base_url}}/mappings/{{mapping_id}}/knowledge-suggestions?conversion_id={{conversion_id}}&limit=10", "host": ["{{base_url}}"], "path": ["mappings", "{{mapping_id}}", "knowledge-suggestions"], "query": [{"key": "conversion_id", "value": "{{conversion_id}}"}, {"key": "limit", "value": "10"}]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Suggestions are advisory and explained', () => { pm.response.to.have.status(200); const rows=pm.response.json(); pm.expect(rows).to.be.an('array'); rows.forEach(x => { pm.expect(['HIGH','MEDIUM','LOW']).to.include(x.relevance); pm.expect(x.reasons.length).to.be.above(0); pm.expect(x.advisory).to.include('does not prove'); }); });"]}}]
+    },
+    {
+      "name": "8. Cross-project / cross-user authorization",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{other_token}}"}], "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}"]}, "description": "Set other_token to a second local user's JWT. Expected 404 prevents resource disclosure."},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Knowledge is owner-isolated', () => pm.response.to.have.status(404));"]}}]
+    },
+    {
+      "name": "9. Archive published knowledge",
+      "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"decision\": \"archive\",\n  \"notes\": \"Withdrawn from future recommendations while retaining audit history.\"\n}"}, "url": {"raw": "{{base_url}}/knowledge-candidates/{{knowledge_candidate_id}}/review", "host": ["{{base_url}}"], "path": ["knowledge-candidates", "{{knowledge_candidate_id}}", "review"]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Publication archived without deletion', () => { pm.response.to.have.status(200); const b=pm.response.json(); pm.expect(b.status).to.eql('archived'); pm.expect(b.events.some(e => e.event_type === 'archive')).to.eql(true); });"]}}]
+    },
+    {
+      "name": "10. View archived or rejected history",
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{token}}"}], "url": {"raw": "{{base_url}}/projects/{{project_id}}/knowledge-candidates?status=archived", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "knowledge-candidates"], "query": [{"key": "status", "value": "archived"}]}},
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test('Archived history retained', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().items.every(x => x.status === 'archived')).to.eql(true); });"]}}]
+    }
+  ]
+}

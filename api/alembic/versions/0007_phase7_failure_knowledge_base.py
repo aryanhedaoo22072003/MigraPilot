@@ -2,7 +2,7 @@
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0007_phase7_failure_knowledge_base"
+revision = "0007_phase7_knowledge_base"
 down_revision = "0006_autopsy_timeout_recovery"
 branch_labels = None
 depends_on = None
@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("signature_metadata", sa.JSON(), nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("root_cause_summary", sa.Text(), nullable=False),
         sa.Column("suggested_corrective_actions", sa.JSON(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column("proposed_sql", sa.Text()),
         sa.Column("verified_remediation_summary", sa.Text()),
         sa.Column("fixture_id", sa.String(100), nullable=False),
         sa.Column("verification_outcome", sa.String(30)),

@@ -92,6 +92,7 @@ async def create_candidate(db: AsyncSession, autopsy: Autopsy, owner_id: int) ->
         signature_metadata=build_signature(mapping, diagnosis, run),
         root_cause_summary=diagnosis.suspected_root_cause,
         suggested_corrective_actions=diagnosis.suggested_corrective_actions,
+        proposed_sql=diagnosis.suggested_sql,
         fixture_id=run.fixture_id, status="draft",
     )
     db.add(candidate)

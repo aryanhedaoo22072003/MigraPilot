@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { AlertTriangle, BrainCircuit, Check, ChevronDown, Clipboard, Clock3, GitCompareArrows, LoaderCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, BookOpen, BrainCircuit, Check, ChevronDown, Clipboard, Clock3, GitCompareArrows, LoaderCircle, RefreshCw, Search, ShieldAlert } from 'lucide-react'
 import {
-  getAutopsy, getErrorMessage, listAutopsies, startAutopsy,
+  createKnowledgeCandidate, findKnowledgeCandidateByAutopsy, getAutopsy, getErrorMessage, listAutopsies, startAutopsy,
   type AutopsyDiagnosisCategory, type AutopsyRecord, type ShadowRun,
 } from '../../lib/api'
 import { SqlDiff, SqlEditor } from '../conversion/CodeEditor'
@@ -120,6 +120,20 @@ export default function AutopsyPanel({
 
   const detail = report.data?.shadow_run_id === run.id ? report.data : undefined
   const item = detail ?? ordered.find(entry => entry.id === selectedId)
+  const candidate = useQuery({
+    queryKey: ['knowledge-by-autopsy', run.project_id, item?.id],
+    queryFn: () => findKnowledgeCandidateByAutopsy(run.project_id, item!.id),
+    enabled: item?.status === 'completed', retry: false,
+  })
+  const createCandidate = useMutation({
+    mutationFn: () => createKnowledgeCandidate(item!.id), retry: false,
+    onSuccess: result => {
+      queryClient.setQueryData(['knowledge-by-autopsy', run.project_id, item!.id], result)
+    },
+    onError: async error => {
+      if (axios.isAxiosError(error) && error.response?.status === 409) await candidate.refetch()
+    },
+  })
   const diagnosis = item?.diagnosis_json
   const category = item?.diagnosis_category ?? diagnosis?.diagnosis_category
   const confidence = item?.confidence ?? diagnosis?.confidence
@@ -177,6 +191,7 @@ export default function AutopsyPanel({
           {pollLimitReached && <div className="autopsy-notice"><span>Automatic polling paused after the bounded wait. The analysis may still be active.</span><button className="btn-outline" onClick={() => { pollCount.current = 0; report.refetch() }}>Refresh status</button></div>}
           {item.status === 'failed' && <div className="autopsy-error" role="alert"><AlertTriangle size={15} /><div><strong>AI analysis failed</strong><p>{failureMessage(item.provider_error)}</p><code>{item.provider_error ?? 'unknown_failure'}</code></div></div>}
           {item.status === 'completed' && diagnosis && <>
+            <section className="autopsy-knowledge"><div><BookOpen size={16} /><span><strong>Failure Knowledge Base</strong><small>{candidate.data ? `Knowledge #${candidate.data.id} preserves this diagnosis and its verification trail.` : 'Create a draft explicitly; publication still requires passing evidence and review.'}</small></span></div>{candidate.isLoading ? <span>Checking…</span> : candidate.data ? <a className="btn-outline" href={`/app/projects/${run.project_id}/knowledge?candidate=${candidate.data.id}`}>View Knowledge Candidate</a> : <button className="btn-outline" disabled={createCandidate.isPending} onClick={() => createCandidate.mutate()}>{createCandidate.isPending ? 'Creating…' : 'Create Knowledge Candidate'}</button>}{candidate.isError && <p role="alert">{getErrorMessage(candidate.error)}</p>}{createCandidate.isError && !(axios.isAxiosError(createCandidate.error) && createCandidate.error.response?.status === 409) && <p role="alert">{getErrorMessage(createCandidate.error)}</p>}</section>
             <div className="autopsy-root-cause"><span>Suspected root cause</span><p>{diagnosis.suspected_root_cause || 'Not supplied.'}</p></div>
             <div className="autopsy-tags"><div><span>Affected transformations</span>{diagnosis.affected_transformations?.length ? diagnosis.affected_transformations.map(value => <code key={value}>{value}</code>) : <em>None supplied</em>}</div><div><span>Affected columns</span>{diagnosis.affected_columns?.length ? diagnosis.affected_columns.map(value => <code key={value}>{value}</code>) : <em>None supplied</em>}</div></div>
             <ListSection title="Observed facts" values={diagnosis.observed_facts} />

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import JSON, BigInteger, Integer, DateTime, ForeignKey, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Integer, DateTime, ForeignKey, Index, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -168,7 +168,12 @@ class Autopsy(Base):
 
 class KnowledgeCandidate(Base):
     __tablename__ = "knowledge_candidates"
-    __table_args__ = (UniqueConstraint("project_id", "source_autopsy_id", name="uq_knowledge_project_autopsy"),)
+    __table_args__ = (
+        UniqueConstraint("project_id", "source_autopsy_id", name="uq_knowledge_project_autopsy"),
+        Index("idx_knowledge_project_status", "project_id", "status", "created_at"),
+        Index("idx_knowledge_mapping", "mapping_id"),
+        Index("idx_knowledge_category", "project_id", "diagnosis_category"),
+    )
     id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     project_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     mapping_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("mappings.id", ondelete="CASCADE"), nullable=False)
@@ -185,6 +190,7 @@ class KnowledgeCandidate(Base):
     signature_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     root_cause_summary: Mapped[str] = mapped_column(Text, nullable=False)
     suggested_corrective_actions: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")
+    proposed_sql: Mapped[str | None] = mapped_column(Text)
     verified_remediation_summary: Mapped[str | None] = mapped_column(Text)
     fixture_id: Mapped[str] = mapped_column(String(100), nullable=False)
     verification_outcome: Mapped[str | None] = mapped_column(String(30))
@@ -206,6 +212,7 @@ class KnowledgeCandidate(Base):
 
 class KnowledgeEvent(Base):
     __tablename__ = "knowledge_events"
+    __table_args__ = (Index("idx_knowledge_events_candidate", "candidate_id", "created_at"),)
     id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True)
     candidate_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("knowledge_candidates.id", ondelete="CASCADE"), nullable=False)
     actor_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)

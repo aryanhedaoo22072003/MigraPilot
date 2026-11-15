@@ -69,6 +69,29 @@ export type AutopsyRecord = {
   provider_error: string | null; created_at: string; started_at: string | null; completed_at: string | null
 }
 
+export type KnowledgeStatus = 'draft' | 'verified' | 'published' | 'rejected' | 'archived'
+export type KnowledgeEvent = {
+  id: number; actor_id: number; event_type: string; from_status: KnowledgeStatus | null; to_status: KnowledgeStatus
+  notes: string | null; evidence_snapshot: Record<string, unknown> | null; created_at: string
+}
+export type KnowledgeCandidate = {
+  id: number; project_id: number; mapping_id: number; owner_id: number; source_autopsy_id: number
+  original_shadow_run_id: number; original_conversion_id: number; corrected_conversion_id: number | null
+  corrected_conversion_version: number | null; passing_shadow_run_id: number | null; diagnosis_category: string
+  transformation_identifiers: string[]; affected_columns: string[]; signature_metadata: Record<string, unknown>
+  root_cause_summary: string; suggested_corrective_actions: string[]; proposed_sql: string | null
+  verified_remediation_summary: string | null; fixture_id: string; verification_outcome: string | null
+  verification_scope: string | null; verification_evidence: Record<string, unknown> | null; status: KnowledgeStatus
+  reviewer_id: number | null; review_notes: string | null; created_at: string; verified_at: string | null
+  approved_at: string | null; published_at: string | null; archived_at: string | null; events: KnowledgeEvent[]
+}
+export type KnowledgeCandidateList = { items: KnowledgeCandidate[]; total: number; limit: number; offset: number }
+export type KnowledgeSuggestion = {
+  knowledge_id: number; diagnosis_category: string; relevance: 'HIGH' | 'MEDIUM' | 'LOW'; reasons: string[]
+  root_cause_summary: string; suggested_corrective_actions: string[]; verified_remediation_summary: string
+  fixture_id: string; corrected_conversion_version: number; published_at: string; advisory: string
+}
+
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1', timeout: 20000 })
 api.interceptors.request.use(config => {
   const token = sessionStorage.getItem('migrapilot_token')
@@ -96,4 +119,33 @@ export async function getAutopsy(autopsyId: number): Promise<AutopsyRecord> {
 
 export async function listAutopsies(shadowRunId: number): Promise<AutopsyRecord[]> {
   return (await api.get<AutopsyRecord[]>(`/shadow-runs/${shadowRunId}/autopsies`)).data
+}
+
+export async function listKnowledgeCandidates(projectId: number, options: { status?: KnowledgeStatus; limit?: number; offset?: number } = {}): Promise<KnowledgeCandidateList> {
+  return (await api.get<KnowledgeCandidateList>(`/projects/${projectId}/knowledge-candidates`, { params: options })).data
+}
+export async function getKnowledgeCandidate(id: number): Promise<KnowledgeCandidate> {
+  return (await api.get<KnowledgeCandidate>(`/knowledge-candidates/${id}`)).data
+}
+export async function createKnowledgeCandidate(autopsyId: number): Promise<KnowledgeCandidate> {
+  return (await api.post<KnowledgeCandidate>(`/autopsies/${autopsyId}/knowledge-candidates`)).data
+}
+export async function verifyKnowledgeCandidate(id: number, passingShadowRunId: number): Promise<KnowledgeCandidate> {
+  return (await api.post<KnowledgeCandidate>(`/knowledge-candidates/${id}/verification`, { passing_shadow_run_id: passingShadowRunId })).data
+}
+export async function reviewKnowledgeCandidate(id: number, decision: 'approve' | 'reject' | 'archive', notes: string): Promise<KnowledgeCandidate> {
+  return (await api.post<KnowledgeCandidate>(`/knowledge-candidates/${id}/review`, { decision, notes })).data
+}
+export async function getKnowledgeSuggestions(mappingId: number, conversionId?: number): Promise<KnowledgeSuggestion[]> {
+  return (await api.get<KnowledgeSuggestion[]>(`/mappings/${mappingId}/knowledge-suggestions`, { params: conversionId ? { conversion_id: conversionId } : undefined })).data
+}
+export async function findKnowledgeCandidateByAutopsy(projectId: number, autopsyId: number): Promise<KnowledgeCandidate | null> {
+  const limit = 100
+  for (let offset = 0; offset <= 100_000; offset += limit) {
+    const page = await listKnowledgeCandidates(projectId, { limit, offset })
+    const match = page.items.find(item => item.source_autopsy_id === autopsyId)
+    if (match) return match
+    if (offset + page.items.length >= page.total || page.items.length === 0) return null
+  }
+  return null
 }

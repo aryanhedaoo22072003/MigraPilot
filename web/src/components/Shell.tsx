@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, ArrowLeft, ChevronDown, FolderKanban, Github, LayoutDashboard, LogOut, Menu, Plus, Settings2, Sparkles, X } from 'lucide-react'
+import { Activity, ArrowLeft, BookOpen, ChevronDown, FolderKanban, Github, LayoutDashboard, LogOut, Menu, Plus, Settings2, Sparkles, X } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import Logo from './Logo'
@@ -11,15 +11,20 @@ export default function Shell() {
   const [createOpen, setCreateOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const projectMatch = location.pathname.match(/^\/app\/projects\/(\d+)(?:\/mappings\/(\d+))?/)
-  const lineageActive = Boolean(projectMatch)
-  const lineageHref = lineageActive ? location.pathname : '/app/projects'
+  const projectMatch = location.pathname.match(/^\/app\/projects\/(\d+)(?:\/mappings\/(\d+))?(?:\/|$)/)
+  const globalKnowledgeActive = location.pathname === '/app/knowledge'
+  const knowledgeActive = globalKnowledgeActive || Boolean(projectMatch && location.pathname.endsWith('/knowledge'))
+  const lineageActive = Boolean(projectMatch) && !knowledgeActive
+  const lineageHref = lineageActive ? location.pathname : projectMatch ? `/app/projects/${projectMatch[1]}` : '/app/projects'
+  const knowledgeHref = projectMatch ? `/app/projects/${projectMatch[1]}/knowledge` : '/app/knowledge'
   const breadcrumbs = location.pathname === '/app'
     ? [{ label: 'Overview', href: '/app' }]
+    : globalKnowledgeActive
+      ? [{ label: 'Knowledge Base', href: '/app/knowledge' }]
     : location.pathname === '/app/projects'
       ? [{ label: 'Projects', href: '/app/projects' }]
       : projectMatch
-        ? [{ label: 'Projects', href: '/app/projects' }, { label: `Project ${projectMatch[1]}`, href: `/app/projects/${projectMatch[1]}` }, ...(projectMatch[2] ? [{ label: `Mapping ${projectMatch[2]}`, href: location.pathname }] : [])]
+        ? [{ label: 'Projects', href: '/app/projects' }, { label: `Project ${projectMatch[1]}`, href: `/app/projects/${projectMatch[1]}` }, ...(knowledgeActive ? [{ label: 'Knowledge Base', href: location.pathname }] : projectMatch[2] ? [{ label: `Mapping ${projectMatch[2]}`, href: location.pathname }] : [])]
         : [{ label: 'Workspace', href: '/app' }]
   const navItem = ({ isActive }: { isActive: boolean }) => `flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition ${isActive ? 'bg-violet-400/10 text-violet-200' : 'text-slate-400 hover:bg-[#1b2135] hover:text-slate-100'}`
   return <div className="min-h-screen bg-night-950">
@@ -31,6 +36,7 @@ export default function Shell() {
           <NavLink end to="/app" onClick={() => setMenuOpen(false)} className={navItem}><LayoutDashboard size={18} /> Overview</NavLink>
           <NavLink end to="/app/projects" onClick={() => setMenuOpen(false)} className={navItem}><FolderKanban size={18} /> My Projects</NavLink>
           <Link to={lineageHref} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition ${lineageActive ? 'bg-violet-400/10 text-violet-200' : 'text-slate-400 hover:bg-[#1b2135] hover:text-slate-100'}`}><Activity size={18} /> ETL Lineage</Link>
+          <Link to={knowledgeHref} onClick={() => setMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition ${knowledgeActive ? 'bg-violet-400/10 text-violet-200' : 'text-slate-400 hover:bg-[#1b2135] hover:text-slate-100'}`}><BookOpen size={18} /> Knowledge Base</Link>
         </nav>
         <div className="mt-10 px-3 text-[10px] font-extrabold uppercase tracking-[.25em] text-slate-600">Integrated tools</div>
         <div className="mt-4 space-y-1 text-sm">
@@ -38,7 +44,7 @@ export default function Shell() {
           <div className="flex items-center gap-3 px-3.5 py-3 text-slate-600"><Settings2 size={18} /> Connections</div>
         </div>
         <div className="mt-auto space-y-4 px-2">
-          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Phase 6 active</div><p className="mt-2 text-xs leading-5 text-slate-400">AI SQL, validation, and evidence-backed Autopsy reports are integrated.</p></div>
+          <div className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-violet-500/15 to-cyan-500/5 p-4"><div className="flex items-center gap-2 text-xs font-extrabold text-violet-300"><Sparkles size={14} /> Failure intelligence</div><p className="mt-2 text-xs leading-5 text-slate-400">AI SQL, validation, Autopsy, and verified remediation knowledge are integrated.</p></div>
           <Link to="/" className="flex items-center gap-2 px-2 text-xs text-slate-500 hover:text-white"><ArrowLeft size={14} /> Back to website</Link>
         </div>
       </aside>

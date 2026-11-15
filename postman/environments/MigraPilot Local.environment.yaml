@@ -20,5 +20,13 @@ values:
     value: ''
   - key: autopsy_id
     value: ''
+  - key: source_autopsy_id
+    value: '3'
+  - key: knowledge_candidate_id
+    value: ''
+  - key: failed_shadow_run_id
+    value: '15'
+  - key: passing_shadow_run_id
+    value: ''
   - key: other_token
     secret: true

@@ -1,4 +1,4 @@
-# MigraPilot — through Phase 6A AI Autopsy backend
+# MigraPilot — through Phase 7A verified failure knowledge backend
 
 > **Convert it. Prove it. Fix it.**
 >
@@ -73,6 +73,12 @@ docker compose down
 | POST | `/shadow-runs/{id}/autopsies` | Owner + Engineer/Admin | Queue a diagnosis for a genuine FAIL or sanitized execution failure |
 | GET | `/autopsies/{id}` | Owner | Poll a persisted structured diagnosis |
 | GET | `/shadow-runs/{id}/autopsies` | Owner | List immutable diagnosis history newest first |
+| POST | `/autopsies/{id}/knowledge-candidates` | Owner + Engineer/Admin | Create a draft candidate from a completed diagnosis |
+| GET | `/projects/{id}/knowledge-candidates` | Owner | List/filter paginated project knowledge candidates |
+| GET | `/knowledge-candidates/{id}` | Owner | Retrieve provenance and append-only lifecycle history |
+| POST | `/knowledge-candidates/{id}/verification` | Owner + Engineer/Admin | Attach independent same-fixture PASS evidence |
+| POST | `/knowledge-candidates/{id}/review` | Owner + Engineer/Admin | Approve, reject, or archive through validated transitions |
+| GET | `/mappings/{id}/knowledge-suggestions` | Owner | Explainable deterministic published-knowledge matches |
 
 JWT is kept in `sessionStorage` for this development prototype, not long-term production auth. Move to hardened short-lived access tokens + HttpOnly refresh sessions before deployment. Viewer/admin role provisioning and team memberships are out of scope for Phase 1.
 
@@ -126,7 +132,7 @@ migrapilot-starter/
 
 ## Scope / product honesty
 
-The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. Phase 4 generates review-only dbt SQL and schema documentation. Phase 5 compares that SQL against its controlled synthetic fixture in an isolated shadow database and displays persisted reports in the conversion workspace. Phase 6A can diagnose genuine persisted failures with bounded metadata-only evidence. External warehouse connections, production-row comparisons, automatic repair and the Autopsy frontend are not implemented.
+The parser stores mappings, source/target definitions, supported transformations, ports, expressions and connector-level lineage. The authenticated project workspace renders those records with React Flow; it does not invent graph nodes or edges. Phase 4 generates review-only dbt SQL and schema documentation. Phase 5 compares that SQL against its controlled synthetic fixture in an isolated shadow database and displays persisted reports in the conversion workspace. Phase 6 diagnoses genuine persisted failures with bounded metadata-only evidence and displays the immutable history. Phase 7A publishes knowledge only after independent same-fixture PASS evidence and explicit review. External warehouse connections, production-row comparisons, automatic repair, cross-project knowledge sharing, and embedding retrieval are not implemented.
 
 ## Phase 3 lineage UI
 
@@ -185,6 +191,21 @@ docker compose exec worker python -m app.cli.seed_phase6a_fail_demo \
 
 The command creates/reuses a separate project named **Phase 6A AI Autopsy FAIL Demo**, creates an intentionally wrong `0.80` conversion against a `0.90` reference, and executes it only in `shadow-db`. It prints the new IDs. It is never run at application startup and does not alter Project 6, Mapping 2, conversions 1/2, or existing PASS runs.
 
+## Phase 7A verified failure knowledge
+
+Failure knowledge uses a guarded lifecycle: `draft → verified → published → archived`, with `draft/verified → rejected` as a terminal review path. A completed Gemini Autopsy can create only a draft. Verification requires a different immutable conversion for the same mapping to complete with `PASS` on the same fixture, equal reference/migrated/matched row counts, and zero unresolved mismatch counters. Approval is a separate authenticated action and appends an audit event containing the reviewer, notes, timestamp, and reviewed evidence snapshot. Published knowledge is project-scoped, advisory, never sent to Gemini, never applied automatically, and never executes stored SQL.
+
+Deterministic suggestions compare transformation types, normalized expression operator/function shapes, affected field structure, and saved conversion risk signals. Results use `HIGH`/`MEDIUM`/`LOW` relevance labels with reasons rather than misleading similarity percentages. Archived and non-published candidates are excluded.
+
+For an isolated development demonstration, first run the Phase 6A FAIL seed and create its completed Autopsy. Then explicitly create a corrected immutable conversion and PASS run in that same demo mapping:
+
+```bash
+docker compose exec worker python -m app.cli.seed_phase7a_pass_demo \
+  --owner-email test@migrapilot.dev --confirm-development-only
+```
+
+The command refuses to run without the confirmation flag, requires existing deterministic FAIL provenance, uses only `shadow-db`, and does not create or publish knowledge. Copy the printed passing Shadow Run ID into Postman. It is never invoked automatically. Do not use Project 7's Autopsy 3 with this separate demo mapping; verification enforces identical mapping and fixture provenance.
+
 ## Phase 2 parser behavior and limits
 
 Uploads are validated before queueing. Defaults limit the HTTP file to 10 MiB, a ZIP to 50 files and 50 MiB uncompressed content, and reject traversal paths, symlinks, suspicious compression ratios, corrupt archives, non-XML members, DTDs and entities. Tune limits with `MAX_UPLOAD_BYTES`, `MAX_ZIP_FILES`, and `MAX_ZIP_UNCOMPRESSED_BYTES`.
@@ -201,10 +222,10 @@ Import `postman/MigraPilot-Phase1.postman_collection.json`, `postman/MigraPilot-
 
 2. PowerCenter XML and ZIP validation / parsing, relational lineage, upload+job APIs. **Implemented.**
 3. React Flow graph, column-level lineage and inspected transformations. **Implemented.**
-4. Real schema-validated provider-to-dbt code conversion, Monaco editor, usage accounting, PII controls. **Backend conversion implemented with Gemini and Anthropic providers; frontend editor remains pending.**
-5. Read-only connections, shadow run comparisons and diff viewer.
-6. AI Autopsy diagnosis backend and suggested fixes. **Backend diagnosis implemented; apply-fix loop/frontend deferred.**
-7. Knowledge base embedding retrieval (requires an embeddings provider compatible with pgvector).
+4. Real schema-validated provider-to-dbt code conversion, Monaco editor, usage accounting, PII controls. **Implemented for the controlled local workflow.**
+5. Read-only connections, shadow run comparisons and diff viewer. **Controlled fixture validation implemented; external connections remain deferred.**
+6. AI Autopsy diagnosis backend and suggested fixes. **Backend and advisory dashboard implemented; automatic apply-fix remains prohibited.**
+7. Verified failure knowledge. **Phase 7A deterministic, project-scoped backend implemented; frontend and embedding retrieval remain deferred.**
 8. Project chat, docs/report generation, production hardening and deployment.
 
 **Security before production:** do not let AI-produced SQL run unreviewed with write credentials. Create isolated read-only warehouse accounts for comparisons and sandbox dbt builds. Add rate limiting, hardened session handling, tenant authorization for every nested resource, encrypted connection configs, signed asset storage, XML security, audit logs, outbound AI redaction, secure token/cost logging, and worker isolation in their implementation phases.

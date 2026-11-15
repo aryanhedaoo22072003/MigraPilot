@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import current_user, owned_project, require_write
-from app.models import Autopsy, Conversion, KnowledgeCandidate, User
+from app.models import Autopsy, Conversion, KnowledgeCandidate, Project, User
 from app.schemas import (
     KnowledgeCandidateListResponse, KnowledgeCandidateResponse, KnowledgeReviewRequest,
     KnowledgeStatus, KnowledgeSuggestionResponse, KnowledgeVerificationRequest,
@@ -22,7 +22,10 @@ router = APIRouter(tags=["Failure Knowledge Base"])
 
 async def _owned_candidate(db: AsyncSession, candidate_id: int, user: User) -> KnowledgeCandidate | None:
     candidate = await load_candidate(db, candidate_id)
-    return candidate if candidate is not None and candidate.owner_id == user.id else None
+    if candidate is None or candidate.owner_id != user.id:
+        return None
+    project = await db.get(Project, candidate.project_id)
+    return candidate if project is not None and project.owner_id == user.id else None
 
 
 def _validation_error(exc: Exception) -> HTTPException:
@@ -42,6 +45,9 @@ async def create_knowledge_candidate(
     require_write(user)
     autopsy = await db.get(Autopsy, autopsy_id)
     if autopsy is None or autopsy.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="AI Autopsy not found")
+    project = await db.get(Project, autopsy.project_id)
+    if project is None or project.owner_id != user.id:
         raise HTTPException(status_code=404, detail="AI Autopsy not found")
     duplicate = await db.scalar(select(KnowledgeCandidate).where(
         KnowledgeCandidate.project_id == autopsy.project_id,

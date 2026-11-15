@@ -4,6 +4,8 @@ import Landing from './pages/Landing'
 import Auth from './pages/Auth'
 import Dashboard from './pages/Dashboard'
 import ProjectWorkspace from './pages/ProjectWorkspace'
+import KnowledgeBasePage from './features/knowledge/KnowledgeBasePage'
+import KnowledgeProjectSelector from './pages/KnowledgeProjectSelector'
 import { useAuth } from './lib/auth'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -19,7 +21,9 @@ export default function App() {
     <Route path="/app" element={<Protected><Shell /></Protected>}>
       <Route index element={<Dashboard />} />
       <Route path="projects" element={<Dashboard />} />
+      <Route path="knowledge" element={<KnowledgeProjectSelector />} />
       <Route path="projects/:id" element={<ProjectWorkspace />} />
+      <Route path="projects/:id/knowledge" element={<KnowledgeBasePage />} />
       <Route path="projects/:id/mappings/:mappingId" element={<ProjectWorkspace />} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

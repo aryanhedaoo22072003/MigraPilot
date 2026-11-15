@@ -401,6 +401,7 @@ class KnowledgeCandidateResponse(BaseModel):
     signature_metadata: dict
     root_cause_summary: str
     suggested_corrective_actions: list[str]
+    proposed_sql: str | None
     verified_remediation_summary: str | None
     fixture_id: str
     verification_outcome: str | None

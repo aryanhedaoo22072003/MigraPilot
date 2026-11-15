@@ -5,6 +5,7 @@ import LineageGraph from '../lineage/LineageGraph'
 import { api, getErrorMessage, type Conversion, type ConversionSummary, type MappingDetail } from '../../lib/api'
 import { SqlDiff, SqlEditor } from './CodeEditor'
 import ShadowRunsPanel from '../validation/ShadowRunsPanel'
+import RelatedKnowledge from '../knowledge/RelatedKnowledge'
 
 type WorkspaceTab = 'lineage' | 'conversion'
 type ArtifactTab = 'sql' | 'schema'
@@ -159,6 +160,7 @@ export default function ConversionWorkspace({ mapping }: { mapping: MappingDetai
           <div className="conversion-metadata">
             <div><span>Version</span><strong>v{selected.data.version}</strong></div><div><span>Advisory confidence</span><strong>{selected.data.confidence ?? '—'}{selected.data.confidence !== null ? '%' : ''}</strong></div><div><span>Model</span><strong>{selected.data.model_used ?? 'Unknown'}</strong></div><div><span>Created</span><strong>{formatTime(selected.data.created_at)}</strong></div>
           </div>
+          <RelatedKnowledge projectId={mapping.project_id} mappingId={mapping.id} conversionId={selected.data.id} />
           <div className="conversion-mode-tabs" role="tablist" aria-label="Conversion and validation views"><button role="tab" aria-selected={conversionView === 'code'} onClick={() => setConversionView('code')}><Code2 size={13} /> Code & review</button><button role="tab" aria-selected={conversionView === 'validation'} onClick={() => setConversionView('validation')}><ShieldAlert size={13} /> Validation</button></div>
           {conversionView === 'code' ? <>
           <div className="conversion-artifact-tabs" role="tablist"><button role="tab" aria-selected={artifactTab === 'sql'} onClick={() => setArtifactTab('sql')}>model.sql</button><button role="tab" aria-selected={artifactTab === 'schema'} onClick={() => setArtifactTab('schema')}>schema.yml</button><span className={dirty ? 'text-amber-300' : 'text-emerald-300'}>{dirty ? 'Unsaved local edits' : 'AI version unchanged'}</span></div>

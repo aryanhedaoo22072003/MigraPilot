@@ -188,6 +188,7 @@ CREATE TABLE knowledge_candidates (
   signature_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   root_cause_summary TEXT NOT NULL,
   suggested_corrective_actions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  proposed_sql TEXT,
   verified_remediation_summary TEXT,
   fixture_id VARCHAR(100) NOT NULL,
   verification_outcome VARCHAR(30) CHECK (verification_outcome IS NULL OR verification_outcome='PASS'),
